@@ -82,7 +82,7 @@ export function RecentSessions({ refreshToken = 0 }: RecentSessionsProps) {
               {hr.upload.recentSessions}
             </CardTitle>
             <CardDescription>
-              {loading ? "…" : sessions.length > 0 ? hr.upload.recentSessionsHint : hr.upload.noRecentSessions}
+              {loading ? "…" : sessions.length > 0 ? hr.upload.recentSessionsHint : null}
             </CardDescription>
           </div>
           {!loading && sessions.length > 0 && (
