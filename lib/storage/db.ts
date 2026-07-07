@@ -1,9 +1,11 @@
 import Dexie, { type Table } from "dexie";
 import type { MatchReason } from "@/lib/types";
+import { defaultSessionName } from "@/lib/session-name";
 
 export type ImportSessionRow = {
   id: string;
   filename: string;
+  name: string;
   importedAt: Date;
 };
 
@@ -74,6 +76,22 @@ class InvoiceMatchDatabase extends Dexie {
       matchAudits: "id, sessionId, at",
       clientPayerKeys: "clientNormalized, payerKey",
     });
+    this.version(2)
+      .stores({
+        importSessions: "id, importedAt, name",
+        invoices: "id, sessionId",
+        payments: "id, sessionId",
+        matches: "id, sessionId, invoiceId, paymentId, active",
+        matchAudits: "id, sessionId, at",
+        clientPayerKeys: "clientNormalized, payerKey",
+      })
+      .upgrade(async (tx) => {
+        await tx.table("importSessions").toCollection().modify((session) => {
+          if (!session.name) {
+            session.name = defaultSessionName(session.filename);
+          }
+        });
+      });
   }
 }
 

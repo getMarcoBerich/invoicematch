@@ -1,11 +1,25 @@
 import { parseExcelBuffer } from "@/lib/excel/parser";
 import { hr } from "@/lib/i18n/hr";
+import { defaultSessionName, getSessionDisplayName } from "@/lib/session-name";
 import { deleteAllPayerKeys } from "@/lib/services/client-keys";
 import { getDb } from "@/lib/storage/db";
 import type { RecordRow } from "@/lib/types";
 import { nanoid } from "nanoid";
 
 export type { RecordRow };
+export { getSessionDisplayName };
+
+export async function renameSession(sessionId: string, name: string) {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error(hr.api.sessionNameRequired);
+
+  const db = getDb();
+  const session = await db.importSessions.get(sessionId);
+  if (!session) throw new Error(hr.api.sessionNotFound);
+
+  await db.importSessions.update(sessionId, { name: trimmed });
+  return trimmed;
+}
 
 export async function importExcelFile(filename: string, buffer: ArrayBuffer) {
   const parsed = await parseExcelBuffer(buffer);
@@ -17,6 +31,7 @@ export async function importExcelFile(filename: string, buffer: ArrayBuffer) {
   const db = getDb();
   const sessionId = nanoid();
   const now = new Date();
+  const name = defaultSessionName(filename);
 
   const invoiceRows = parsed.invoices.map((inv) => ({
     id: nanoid(),
@@ -44,6 +59,7 @@ export async function importExcelFile(filename: string, buffer: ArrayBuffer) {
     await db.importSessions.add({
       id: sessionId,
       filename,
+      name,
       importedAt: now,
     });
     if (invoiceRows.length > 0) await db.invoices.bulkAdd(invoiceRows);
@@ -53,6 +69,7 @@ export async function importExcelFile(filename: string, buffer: ArrayBuffer) {
   return {
     sessionId,
     filename,
+    name,
     sheetName: parsed.sheetName,
     invoiceCount: parsed.invoices.length,
     paymentCount: parsed.payments.length,
@@ -61,7 +78,7 @@ export async function importExcelFile(filename: string, buffer: ArrayBuffer) {
 }
 
 export async function getSessionRecords(sessionId: string): Promise<{
-  session: { id: string; filename: string; importedAt: Date };
+  session: { id: string; filename: string; name: string; importedAt: Date };
   records: RecordRow[];
   stats: {
     totalInvoices: number;
@@ -153,6 +170,7 @@ export async function getSessionRecords(sessionId: string): Promise<{
     session: {
       id: session.id,
       filename: session.filename,
+      name: session.name,
       importedAt: session.importedAt,
     },
     records,
@@ -185,6 +203,7 @@ export async function listSessionSummaries(limit = 30) {
       return {
         id: session.id,
         filename: session.filename,
+        name: session.name,
         importedAt: session.importedAt,
         invoiceCount: sessionInvoices.length,
         paymentCount: sessionPayments.length,

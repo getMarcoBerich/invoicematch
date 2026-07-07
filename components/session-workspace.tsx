@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Download, Loader2, RefreshCw } from "lucide-react";
+import { ArrowLeft, Download, Loader2, Pencil, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -11,6 +11,7 @@ import { FilterPanel, defaultFilters, type FilterState } from "@/components/filt
 import { MatchTable } from "@/components/match-table";
 import { LinkDialog } from "@/components/link-dialog";
 import { ClientKeysPanel } from "@/components/client-keys-panel";
+import { RenameSessionDialog } from "@/components/rename-session-dialog";
 import type { PayerKeyMap } from "@/lib/clients/payer-keys";
 import {
   buildPayerKeyMapFromApi,
@@ -24,11 +25,11 @@ import { formatAmount, formatDateTime } from "@/lib/format";
 import { hr } from "@/lib/i18n/hr";
 import { runAutoMatch, unlinkMatch } from "@/lib/matching/engine";
 import { getSessionClientKeys } from "@/lib/services/client-keys";
-import { getSessionRecords } from "@/lib/services/session";
+import { getSessionDisplayName, getSessionRecords } from "@/lib/services/session";
 import type { RecordRow } from "@/lib/types";
 
 type SessionData = {
-  session: { id: string; filename: string; importedAt: string | Date };
+  session: { id: string; filename: string; name: string; importedAt: string | Date };
   records: RecordRow[];
   stats: {
     totalInvoices: number;
@@ -62,6 +63,7 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
   const [dialog, setDialog] = useState<DialogState>(null);
   const [matching, setMatching] = useState(false);
   const [payerKeyMap, setPayerKeyMap] = useState<PayerKeyMap>(new Map());
+  const [renameOpen, setRenameOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -138,13 +140,15 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
 
   const handleExportAll = () => {
     const csv = buildRecordsCsv(data.records);
-    downloadCsvFile(csv, recordsCsvFilename(data.session.filename, "all"));
+    downloadCsvFile(csv, recordsCsvFilename(getSessionDisplayName(data.session), "all"));
   };
 
   const handleExportView = () => {
     const csv = buildRecordsCsv(filteredRecords);
-    downloadCsvFile(csv, recordsCsvFilename(data.session.filename, "view"));
+    downloadCsvFile(csv, recordsCsvFilename(getSessionDisplayName(data.session), "view"));
   };
+
+  const displayName = getSessionDisplayName(data.session);
 
   return (
     <div className="space-y-2">
@@ -158,9 +162,21 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
             {hr.workspace.back}
           </Link>
           <div className="min-w-0">
-            <h1 className="truncate text-lg font-semibold">{data.session.filename}</h1>
+            <div className="flex min-w-0 items-center gap-1">
+              <h1 className="truncate text-lg font-semibold">{displayName}</h1>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="shrink-0"
+                onClick={() => setRenameOpen(true)}
+                aria-label={hr.workspace.renameSession}
+              >
+                <Pencil className="size-3.5" />
+              </Button>
+            </div>
             <p className="text-xs text-muted-foreground">
-              {hr.workspace.imported} {formatDateTime(data.session.importedAt)}
+              {hr.workspace.sourceFile(data.session.filename)} · {hr.workspace.imported}{" "}
+              {formatDateTime(data.session.importedAt)}
             </p>
           </div>
         </div>
@@ -304,6 +320,19 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
         }
         overrideRecord={dialog?.mode === "override" ? dialog.record : undefined}
         onComplete={load}
+      />
+
+      <RenameSessionDialog
+        open={renameOpen}
+        onOpenChange={setRenameOpen}
+        sessionId={sessionId}
+        currentName={data.session.name}
+        filename={data.session.filename}
+        onRenamed={(name) => {
+          setData((current) =>
+            current ? { ...current, session: { ...current.session, name } } : current,
+          );
+        }}
       />
     </div>
   );

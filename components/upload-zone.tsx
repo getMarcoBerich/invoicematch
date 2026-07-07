@@ -5,14 +5,17 @@ import { useRouter } from "next/navigation";
 import { FileSpreadsheet, Loader2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { hr } from "@/lib/i18n/hr";
 import { RecentSessions } from "@/components/recent-sessions";
 import { FormatExample } from "@/components/format-example";
-import { importExcelFile } from "@/lib/services/session";
+import { importExcelFile, renameSession } from "@/lib/services/session";
 
 type ImportResult = {
   sessionId: string;
   filename: string;
+  name: string;
   sheetName: string;
   invoiceCount: number;
   paymentCount: number;
@@ -25,12 +28,15 @@ export function UploadZone() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
+  const [sessionName, setSessionName] = useState("");
+  const [opening, setOpening] = useState(false);
   const [sessionsRefreshToken, setSessionsRefreshToken] = useState(0);
 
   const uploadFile = useCallback(async (file: File) => {
     setLoading(true);
     setError(null);
     setResult(null);
+    setSessionName("");
 
     if (!file.name.toLowerCase().endsWith(".xlsx")) {
       setError(hr.api.excelOnly);
@@ -43,6 +49,7 @@ export function UploadZone() {
       const data = await importExcelFile(file.name, buffer);
 
       setResult(data);
+      setSessionName(data.name);
       setSessionsRefreshToken((token) => token + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : hr.upload.uploadFailed);
@@ -66,6 +73,24 @@ export function UploadZone() {
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) uploadFile(file);
+  };
+
+  const handleOpenWorkspace = async () => {
+    if (!result) return;
+    setOpening(true);
+    setError(null);
+    try {
+      const trimmed = sessionName.trim();
+      if (trimmed && trimmed !== result.name) {
+        await renameSession(result.sessionId, trimmed);
+        setSessionsRefreshToken((token) => token + 1);
+      }
+      router.push(`/session/?id=${result.sessionId}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : hr.upload.uploadFailed);
+    } finally {
+      setOpening(false);
+    }
   };
 
   return (
@@ -147,8 +172,23 @@ export function UploadZone() {
               </div>
             )}
 
-            <Button className="w-full" onClick={() => router.push(`/session/?id=${result.sessionId}`)}>
-              {hr.upload.openWorkspace}
+            <div className="space-y-2">
+              <Label htmlFor="import-session-name">{hr.upload.sessionName}</Label>
+              <Input
+                id="import-session-name"
+                value={sessionName}
+                onChange={(e) => setSessionName(e.target.value)}
+                placeholder={hr.workspace.sessionNamePlaceholder}
+              />
+              <p className="text-xs text-muted-foreground">{hr.upload.sessionNameHint}</p>
+            </div>
+
+            <Button
+              className="w-full"
+              disabled={opening || !sessionName.trim()}
+              onClick={() => void handleOpenWorkspace()}
+            >
+              {opening ? <Loader2 className="size-4 animate-spin" /> : hr.upload.openWorkspace}
             </Button>
           </CardContent>
         </Card>

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Clock, FileSpreadsheet, Loader2, Trash2 } from "lucide-react";
+import { ChevronRight, Clock, FileSpreadsheet, Loader2, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -15,11 +15,14 @@ import {
 } from "@/components/ui/dialog";
 import { formatDateTime } from "@/lib/format";
 import { hr } from "@/lib/i18n/hr";
+import { getSessionDisplayName } from "@/lib/session-name";
 import { deleteAllSessions, listSessionSummaries } from "@/lib/services/session";
+import { RenameSessionDialog } from "@/components/rename-session-dialog";
 
 type SessionSummary = {
   id: string;
   filename: string;
+  name: string;
   importedAt: string | Date;
   invoiceCount: number;
   paymentCount: number;
@@ -37,6 +40,7 @@ export function RecentSessions({ refreshToken = 0 }: RecentSessionsProps) {
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<SessionSummary | null>(null);
 
   const loadSessions = useCallback(async () => {
     setLoading(true);
@@ -108,29 +112,43 @@ export function RecentSessions({ refreshToken = 0 }: RecentSessionsProps) {
             <p className="text-sm text-muted-foreground">{hr.upload.noRecentSessions}</p>
           ) : (
             <ul className="divide-y rounded-lg border">
-              {sessions.map((session) => (
+              {sessions.map((session) => {
+                const displayName = getSessionDisplayName(session);
+                return (
                 <li key={session.id}>
-                  <button
-                    type="button"
-                    onClick={() => router.push(`/session/?id=${session.id}`)}
-                    className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50"
-                  >
-                    <FileSpreadsheet className="size-4 shrink-0 text-muted-foreground" />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{session.filename}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDateTime(session.importedAt)} ·{" "}
-                        {hr.upload.sessionSummary(
-                          session.invoiceCount,
-                          session.paymentCount,
-                          session.matchedCount,
-                        )}
-                      </p>
-                    </div>
-                    <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-                  </button>
+                  <div className="flex items-center gap-1 px-2 py-1">
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/session/?id=${session.id}`)}
+                      className="flex min-w-0 flex-1 items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-muted/50"
+                    >
+                      <FileSpreadsheet className="size-4 shrink-0 text-muted-foreground" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium">{displayName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDateTime(session.importedAt)} ·{" "}
+                          {hr.upload.sessionSummary(
+                            session.invoiceCount,
+                            session.paymentCount,
+                            session.matchedCount,
+                          )}
+                        </p>
+                      </div>
+                      <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                    </button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="shrink-0"
+                      aria-label={hr.workspace.renameSession}
+                      onClick={() => setRenameTarget(session)}
+                    >
+                      <Pencil className="size-3.5" />
+                    </Button>
+                  </div>
                 </li>
-              ))}
+              );
+              })}
             </ul>
           )}
         </CardContent>
@@ -152,6 +170,23 @@ export function RecentSessions({ refreshToken = 0 }: RecentSessionsProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {renameTarget ? (
+        <RenameSessionDialog
+          open={renameTarget !== null}
+          onOpenChange={(open) => !open && setRenameTarget(null)}
+          sessionId={renameTarget.id}
+          currentName={renameTarget.name}
+          filename={renameTarget.filename}
+          onRenamed={(name) => {
+            setSessions((current) =>
+              current.map((session) =>
+                session.id === renameTarget.id ? { ...session, name } : session,
+              ),
+            );
+          }}
+        />
+      ) : null}
     </>
   );
 }
