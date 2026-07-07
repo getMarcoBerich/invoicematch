@@ -32,14 +32,6 @@ type MatchTableProps = {
   onOverride?: (record: RecordRow) => void;
 };
 
-function showTableTotals(tabView: TabView | undefined) {
-  return (
-    tabView === "matched" ||
-    tabView === "unmatched-invoices" ||
-    tabView === "unmatched-payments"
-  );
-}
-
 function StatusBadge({ status }: { status: RecordRow["matchStatus"] }) {
   const variants: Record<
     RecordRow["matchStatus"],
@@ -116,11 +108,9 @@ export function MatchTable({
 
   const invoiceTotal = sumInvoiceTotals(records);
   const paymentTotal = sumPaymentAmounts(records);
-  const showTotals = showTableTotals(tabView);
-  const showInvoiceTotal =
-    tabView === "matched" || tabView === "unmatched-invoices";
-  const showPaymentTotal =
-    tabView === "matched" || tabView === "unmatched-payments";
+  const showTotals = Boolean(tabView);
+  const showInvoiceTotal = tabView !== "unmatched-payments";
+  const showPaymentTotal = tabView !== "unmatched-invoices";
 
   return (
     <div className="rounded-md border [&_[data-slot=table-cell]]:px-1.5 [&_[data-slot=table-cell]]:py-1 [&_[data-slot=table-head]]:h-8 [&_[data-slot=table-head]]:px-1.5">
