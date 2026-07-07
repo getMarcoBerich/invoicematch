@@ -183,13 +183,16 @@ export function UploadZone() {
               <p className="text-xs text-muted-foreground">{hr.upload.sessionNameHint}</p>
             </div>
 
-            <Button
-              className="w-full"
-              disabled={opening || !sessionName.trim()}
-              onClick={() => void handleOpenWorkspace()}
-            >
-              {opening ? <Loader2 className="size-4 animate-spin" /> : hr.upload.openWorkspace}
-            </Button>
+            <div className="flex justify-center pt-2">
+              <Button
+                size="lg"
+                className="h-auto px-10 py-8 text-lg font-semibold"
+                disabled={opening || !sessionName.trim()}
+                onClick={() => void handleOpenWorkspace()}
+              >
+                {opening ? <Loader2 className="size-4 animate-spin" /> : hr.upload.openWorkspace}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}

@@ -13,7 +13,7 @@ export const hr = {
     invoices: "Računi",
     payments: "Uplate",
     parseWarnings: "Upozorenja pri parsiranju",
-    openWorkspace: "Otvori radni prostor",
+    openWorkspace: "Započni sesiju",
     sessionName: "Naziv sesije",
     sessionNameHint: "Možeš promijeniti prije otvaranja radnog prostora",
     recentSessions: "Nedavne sesije",
