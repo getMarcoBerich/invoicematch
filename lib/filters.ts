@@ -31,6 +31,24 @@ function clientPayerKey(client: string | undefined, map: PayerKeyMap): string | 
   return resolvePayerKey(normalizeClient(client), map);
 }
 
+function resolveFilterDate(
+  record: RecordRow,
+  filters: FilterState,
+  tab: TabView,
+): string | undefined {
+  if (tab === "unmatched-invoices") return record.invoice?.invoiceDate;
+  if (tab === "unmatched-payments") return record.payment?.paymentDate;
+
+  const hasBoth = Boolean(record.invoice && record.payment);
+  if (!hasBoth) {
+    return record.invoice?.invoiceDate ?? record.payment?.paymentDate;
+  }
+
+  return filters.dateField === "invoice"
+    ? record.invoice?.invoiceDate
+    : record.payment?.paymentDate;
+}
+
 export function filterRecords(
   records: RecordRow[],
   filters: FilterState,
@@ -83,8 +101,7 @@ export function filterRecords(
 
   if (filters.dateFrom || filters.dateTo) {
     filtered = filtered.filter((r) => {
-      const date =
-        filters.dateField === "invoice" ? r.invoice?.invoiceDate : r.payment?.paymentDate;
+      const date = resolveFilterDate(r, filters, tab);
       if (!date) return false;
       if (filters.dateFrom && date < filters.dateFrom) return false;
       if (filters.dateTo && date > filters.dateTo) return false;

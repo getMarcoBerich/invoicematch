@@ -462,7 +462,8 @@ export function LinkDialog({
   const [unmatchedPayments, setUnmatchedPayments] = useState<UnmatchedPayment[]>([]);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const dialogKey = `${mode}-${sourceId ?? ""}-${overrideRecord?.matchId ?? ""}`;
 
@@ -473,7 +474,8 @@ export function LinkDialog({
 
     void (async () => {
       setLoading(true);
-      setError(null);
+      setLoadError(null);
+      setSubmitError(null);
       setSelectedInvoiceId(
         mode === "link-invoice" ? (sourceId ?? null) : (overrideRecord?.invoice?.id ?? null),
       );
@@ -493,7 +495,7 @@ export function LinkDialog({
         setUnmatchedPayments(data.unmatchedPayments);
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : hr.dialog.loadFailed);
+          setLoadError(err instanceof Error ? err.message : hr.dialog.loadFailed);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -507,7 +509,7 @@ export function LinkDialog({
 
   const handleSubmit = async () => {
     setSubmitting(true);
-    setError(null);
+    setSubmitError(null);
 
     try {
       if (mode === "override" && overrideRecord?.matchId) {
@@ -532,7 +534,7 @@ export function LinkDialog({
       onComplete();
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : hr.dialog.operationFailed);
+      setSubmitError(err instanceof Error ? err.message : hr.dialog.operationFailed);
     } finally {
       setSubmitting(false);
     }
@@ -578,8 +580,8 @@ export function LinkDialog({
             <div className="flex justify-center py-8">
               <Loader2 className="size-6 animate-spin text-muted-foreground" />
             </div>
-          ) : error ? (
-            <p className="text-sm text-destructive">{error}</p>
+          ) : loadError ? (
+            <p className="text-sm text-destructive">{loadError}</p>
           ) : listEmpty ? (
             <p className="text-sm text-muted-foreground">
               {mode === "link-invoice"
@@ -587,12 +589,18 @@ export function LinkDialog({
                 : hr.dialog.noUnmatchedInvoices}
             </p>
           ) : (
-            <div
-              className={cn(
-                "gap-4",
-                mode === "override" ? "grid lg:grid-cols-2" : "flex flex-col",
-              )}
-            >
+            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+              {submitError ? (
+                <p className="shrink-0 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {submitError}
+                </p>
+              ) : null}
+              <div
+                className={cn(
+                  "min-h-0 flex-1 gap-4 overflow-hidden",
+                  mode === "override" ? "grid lg:grid-cols-2" : "flex flex-col",
+                )}
+              >
               {showInvoices && (
                 <div className="min-w-0">
                   <p className="mb-2 text-sm font-medium">{hr.dialog.invoice}</p>
@@ -618,6 +626,7 @@ export function LinkDialog({
                   </div>
                 </div>
               )}
+              </div>
             </div>
           )}
         </div>

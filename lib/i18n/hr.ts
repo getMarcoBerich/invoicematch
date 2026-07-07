@@ -34,7 +34,7 @@ export const hr = {
         "Računi i uplate moraju biti u istom redu, jedan pored drugog. Red zaglavlja mora sadržavati „Broj” i „Iznos”.",
       invoicesSection: "Računi (lijevo)",
       paymentsSection: "Uplate (desno)",
-      note: "Stupci između sekcija mogu biti prazni. Osnovica i PDV nisu potrebni — za uparivanje se koristi TOTAL. Aplikacija automatski prepoznaje stupce prema zaglavlju.",
+      note: "Stupci između sekcija mogu biti prazni. Osnovica i PDV nisu potrebni, za uparivanje se koristi TOTAL. Aplikacija automatski prepoznaje stupce prema zaglavlju.",
     },
   },
   workspace: {
