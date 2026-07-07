@@ -14,7 +14,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatAmount, formatDate } from "@/lib/format";
-import type { TabView } from "@/lib/filters";
+import {
+  sumInvoiceTotals,
+  sumPaymentAmounts,
+  type TabView,
+} from "@/lib/filters";
 import { hr } from "@/lib/i18n/hr";
 import type { RecordRow } from "@/lib/services/session";
 import type { MatchReason } from "@/lib/types";
@@ -27,14 +31,6 @@ type MatchTableProps = {
   onUnlink?: (matchId: string) => void;
   onOverride?: (record: RecordRow) => void;
 };
-
-function sumInvoiceTotals(records: RecordRow[]) {
-  return records.reduce((sum, r) => sum + (r.invoice?.total ?? 0), 0);
-}
-
-function sumPaymentAmounts(records: RecordRow[]) {
-  return records.reduce((sum, r) => sum + Math.abs(r.payment?.amount ?? 0), 0);
-}
 
 function showTableTotals(tabView: TabView | undefined) {
   return (
