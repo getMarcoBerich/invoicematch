@@ -9,45 +9,46 @@ export type { RecordRow };
 
 export async function importExcelFile(filename: string, buffer: ArrayBuffer) {
   const parsed = await parseExcelBuffer(buffer);
+
+  if (parsed.invoices.length === 0 && parsed.payments.length === 0) {
+    throw new Error(hr.api.importEmpty);
+  }
+
   const db = getDb();
   const sessionId = nanoid();
   const now = new Date();
 
-  await db.importSessions.add({
-    id: sessionId,
-    filename,
-    importedAt: now,
+  const invoiceRows = parsed.invoices.map((inv) => ({
+    id: nanoid(),
+    sessionId,
+    invoiceNumber: inv.invoiceNumber,
+    invoiceDate: inv.invoiceDate,
+    client: inv.client,
+    baseAmount: inv.baseAmount,
+    vat: inv.vat,
+    total: inv.total,
+    rowHash: inv.rowHash,
+  }));
+
+  const paymentRows = parsed.payments.map((pay) => ({
+    id: nanoid(),
+    sessionId,
+    paymentDate: pay.paymentDate,
+    amount: pay.amount,
+    client: pay.client,
+    description: pay.description,
+    rowHash: pay.rowHash,
+  }));
+
+  await db.transaction("rw", [db.importSessions, db.invoices, db.payments], async () => {
+    await db.importSessions.add({
+      id: sessionId,
+      filename,
+      importedAt: now,
+    });
+    if (invoiceRows.length > 0) await db.invoices.bulkAdd(invoiceRows);
+    if (paymentRows.length > 0) await db.payments.bulkAdd(paymentRows);
   });
-
-  if (parsed.invoices.length > 0) {
-    await db.invoices.bulkAdd(
-      parsed.invoices.map((inv) => ({
-        id: nanoid(),
-        sessionId,
-        invoiceNumber: inv.invoiceNumber,
-        invoiceDate: inv.invoiceDate,
-        client: inv.client,
-        baseAmount: inv.baseAmount,
-        vat: inv.vat,
-        total: inv.total,
-        rowHash: inv.rowHash,
-      })),
-    );
-  }
-
-  if (parsed.payments.length > 0) {
-    await db.payments.bulkAdd(
-      parsed.payments.map((pay) => ({
-        id: nanoid(),
-        sessionId,
-        paymentDate: pay.paymentDate,
-        amount: pay.amount,
-        client: pay.client,
-        description: pay.description,
-        rowHash: pay.rowHash,
-      })),
-    );
-  }
 
   return {
     sessionId,

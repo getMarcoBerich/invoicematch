@@ -5,7 +5,7 @@ export const hr = {
   },
   upload: {
     dropHere: "Povuci Excel datoteku ovdje",
-    formatHint: "KARTICA format — računi i bankovne uplate jedan pored drugog",
+    formatHint: "Računi i bankovne uplate jedan pored drugog",
     browse: "Odaberi datoteku",
     uploadFailed: "Učitavanje nije uspjelo",
     importComplete: "Uvoz završen",
@@ -149,6 +149,7 @@ export const hr = {
     noFile: "Datoteka nije učitana",
     excelOnly: "Podržane su samo Excel datoteke (.xlsx)",
     importFailed: "Uvoz nije uspio",
+    importEmpty: "Datoteka ne sadrži račune ni uplate",
     sessionIdRequired: "sessionId je obavezan",
     fetchRecordsFailed: "Dohvat zapisa nije uspio",
     matchingFailed: "Uparivanje nije uspjelo",

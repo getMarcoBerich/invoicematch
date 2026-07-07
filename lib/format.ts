@@ -18,6 +18,11 @@ export function formatAmount(amount: number | null | undefined): string {
 }
 
 export function formatDateTime(date: Date | string): string {
-  const d = typeof date === "string" ? new Date(date) : date;
-  return format(d, "dd.MM.yyyy HH:mm");
+  try {
+    const d = typeof date === "string" ? new Date(date) : date;
+    if (Number.isNaN(d.getTime())) return "—";
+    return format(d, "dd.MM.yyyy HH:mm");
+  } catch {
+    return "—";
+  }
 }

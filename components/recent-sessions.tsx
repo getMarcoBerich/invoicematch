@@ -53,7 +53,7 @@ export function RecentSessions({ refreshToken = 0 }: RecentSessionsProps) {
     }
   }, []);
 
-  const deleteAllSessions = async () => {
+  const deleteAllSessionsHandler = async () => {
     setDeleting(true);
     setError(null);
 
@@ -112,7 +112,7 @@ export function RecentSessions({ refreshToken = 0 }: RecentSessionsProps) {
                 <li key={session.id}>
                   <button
                     type="button"
-                    onClick={() => router.push(`/session?id=${session.id}`)}
+                    onClick={() => router.push(`/session/?id=${session.id}`)}
                     className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50"
                   >
                     <FileSpreadsheet className="size-4 shrink-0 text-muted-foreground" />
@@ -146,7 +146,7 @@ export function RecentSessions({ refreshToken = 0 }: RecentSessionsProps) {
             <Button variant="outline" disabled={deleting} onClick={() => setConfirmOpen(false)}>
               {hr.upload.deleteAllSessionsCancel}
             </Button>
-            <Button variant="destructive" disabled={deleting} onClick={() => void deleteAllSessions()}>
+            <Button variant="destructive" disabled={deleting} onClick={() => void deleteAllSessionsHandler()}>
               {deleting ? hr.upload.deletingSessions : hr.upload.deleteAllSessionsConfirm}
             </Button>
           </DialogFooter>

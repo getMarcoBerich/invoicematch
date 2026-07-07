@@ -57,11 +57,13 @@ export function ClientKeysPanel({ sessionId, onKeysChanged }: ClientKeysPanelPro
   const [newAliasName, setNewAliasName] = useState("");
   const [newAliasKey, setNewAliasKey] = useState("");
   const [listSearch, setListSearch] = useState("");
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const sessionClientNames = new Set(clients.map((c) => c.name));
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const data = await getSessionClientKeys(sessionId);
       setClients(data.clients);
@@ -73,9 +75,10 @@ export function ClientKeysPanel({ sessionId, onKeysChanged }: ClientKeysPanelPro
         drafts[c.name] = c.payerKey;
       }
       setDraftKeys(drafts);
-    } catch {
+    } catch (err) {
       setClients([]);
       setExtraAliases([]);
+      setLoadError(err instanceof Error ? err.message : hr.clientKeys.loadFailed);
     } finally {
       setLoading(false);
     }
@@ -182,6 +185,7 @@ export function ClientKeysPanel({ sessionId, onKeysChanged }: ClientKeysPanelPro
           {hr.clientKeys.title}
         </h3>
         <p className="mt-1 text-xs text-muted-foreground">{hr.clientKeys.description}</p>
+        {loadError ? <p className="mt-1 text-xs text-destructive">{loadError}</p> : null}
       </div>
 
       <div className="shrink-0 space-y-1">

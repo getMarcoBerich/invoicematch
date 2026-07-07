@@ -48,33 +48,33 @@ export async function runAutoMatch(sessionId: string, threshold = 75) {
 
   const bestMatches = findBestMatches(unmatchedInvoices, unmatchedPayments, threshold);
   const now = new Date();
-  let created = 0;
 
-  for (const match of bestMatches) {
-    const matchId = nanoid();
-    await db.matches.add({
-      id: matchId,
-      sessionId,
-      invoiceId: match.invoiceId,
-      paymentId: match.paymentId,
-      status: "auto",
-      confidence: match.confidence,
-      matchReasons: match.reasons,
-      createdAt: now,
-      active: true,
-    });
-    await db.matchAudits.add({
-      id: nanoid(),
-      matchId,
-      sessionId,
-      action: "created",
-      at: now,
-      meta: { type: "auto", confidence: match.confidence },
-    });
-    created++;
-  }
+  await db.transaction("rw", [db.matches, db.matchAudits], async () => {
+    for (const match of bestMatches) {
+      const matchId = nanoid();
+      await db.matches.add({
+        id: matchId,
+        sessionId,
+        invoiceId: match.invoiceId,
+        paymentId: match.paymentId,
+        status: "auto",
+        confidence: match.confidence,
+        matchReasons: match.reasons,
+        createdAt: now,
+        active: true,
+      });
+      await db.matchAudits.add({
+        id: nanoid(),
+        matchId,
+        sessionId,
+        action: "created",
+        at: now,
+        meta: { type: "auto", confidence: match.confidence },
+      });
+    }
+  });
 
-  return { created, total: bestMatches.length };
+  return { created: bestMatches.length, total: bestMatches.length };
 }
 
 export async function createManualMatch(

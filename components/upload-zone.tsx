@@ -32,6 +32,12 @@ export function UploadZone() {
     setError(null);
     setResult(null);
 
+    if (!file.name.toLowerCase().endsWith(".xlsx")) {
+      setError(hr.api.excelOnly);
+      setLoading(false);
+      return;
+    }
+
     try {
       const buffer = await file.arrayBuffer();
       const data = await importExcelFile(file.name, buffer);
@@ -42,6 +48,8 @@ export function UploadZone() {
       setError(err instanceof Error ? err.message : hr.upload.uploadFailed);
     } finally {
       setLoading(false);
+      const input = document.getElementById("file-input") as HTMLInputElement | null;
+      if (input) input.value = "";
     }
   }, []);
 
@@ -90,7 +98,7 @@ export function UploadZone() {
         <input
           id="file-input"
           type="file"
-          accept=".xlsx,.xls"
+          accept=".xlsx"
           className="hidden"
           onChange={handleFileInput}
           disabled={loading}
@@ -139,7 +147,7 @@ export function UploadZone() {
               </div>
             )}
 
-            <Button className="w-full" onClick={() => router.push(`/session?id=${result.sessionId}`)}>
+            <Button className="w-full" onClick={() => router.push(`/session/?id=${result.sessionId}`)}>
               {hr.upload.openWorkspace}
             </Button>
           </CardContent>
