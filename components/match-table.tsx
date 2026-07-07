@@ -159,7 +159,7 @@ export function MatchTable({
 
             return (
               <TableRow key={key}>
-                <TableCell className="whitespace-normal align-top">
+                <TableCell className="whitespace-normal">
                   <StatusBadge status={record.matchStatus} />
                   {record.confidence !== null && record.matchStatus === "auto" && (
                     <div className="mt-1 text-xs text-muted-foreground">
@@ -174,23 +174,23 @@ export function MatchTable({
                   {record.invoice?.invoiceNumber ?? "—"}
                 </TableCell>
                 <TableCell>{formatDate(record.invoice?.invoiceDate)}</TableCell>
-                <TableCell className="whitespace-normal break-words align-top">
+                <TableCell className="whitespace-normal break-words">
                   {record.invoice?.client ?? "—"}
                 </TableCell>
                 <TableCell className="text-right font-medium tabular-nums">
                   {formatAmount(record.invoice?.total)}
                 </TableCell>
                 <TableCell>{formatDate(record.payment?.paymentDate)}</TableCell>
-                <TableCell className="whitespace-normal break-words align-top">
+                <TableCell className="whitespace-normal break-words">
                   {record.payment?.client ?? "—"}
                 </TableCell>
                 <TableCell className="text-right font-medium tabular-nums">
                   {formatAmount(record.payment?.amount)}
                 </TableCell>
-                <TableCell className="whitespace-normal break-words align-top">
+                <TableCell className="whitespace-normal break-words">
                   {record.payment?.description ?? "—"}
                 </TableCell>
-                <TableCell className="sticky right-0 bg-background align-top shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.12)]">
+                <TableCell className="sticky right-0 bg-background shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.12)]">
                   <div className="flex flex-col gap-1">
                     {record.invoice && !record.payment && onLinkInvoice && (
                       <Button
