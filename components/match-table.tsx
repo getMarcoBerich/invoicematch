@@ -111,6 +111,17 @@ export function MatchTable({
   const showTotals = Boolean(tabView);
   const showInvoiceTotal = tabView !== "unmatched-payments";
   const showPaymentTotal = tabView !== "unmatched-invoices";
+  const showSectionDivider = tabView === "all";
+  const showSectionShading = tabView === "all";
+  const dividerClass = showSectionDivider
+    ? "border-l-2 border-muted-foreground/25 dark:border-muted-foreground/20"
+    : "";
+  const invoiceShadeClass = showSectionShading
+    ? "bg-sky-500/5 group-hover:bg-sky-500/10 dark:bg-sky-500/10 dark:group-hover:bg-sky-500/15"
+    : "";
+  const paymentShadeClass = showSectionShading
+    ? "bg-amber-500/5 group-hover:bg-amber-500/10 dark:bg-amber-500/10 dark:group-hover:bg-amber-500/15"
+    : "";
 
   return (
     <div className="rounded-md border [&_[data-slot=table-cell]]:px-1.5 [&_[data-slot=table-cell]]:py-1 [&_[data-slot=table-head]]:h-8 [&_[data-slot=table-head]]:px-1.5">
@@ -118,18 +129,24 @@ export function MatchTable({
         <TableHeader>
           <TableRow>
             <TableHead className="min-w-[7.5rem] whitespace-normal">{hr.table.status}</TableHead>
-            <TableHead className="min-w-[6rem]">{hr.table.invoiceNumber}</TableHead>
-            <TableHead className="min-w-[6rem]">{hr.table.invoiceDate}</TableHead>
-            <TableHead className="min-w-[12rem] whitespace-normal">
+            <TableHead className={`min-w-[6rem] ${invoiceShadeClass}`}>{hr.table.invoiceNumber}</TableHead>
+            <TableHead className={`min-w-[6rem] ${invoiceShadeClass}`}>{hr.table.invoiceDate}</TableHead>
+            <TableHead className={`min-w-[12rem] whitespace-normal ${invoiceShadeClass}`}>
               {hr.table.invoiceClient}
             </TableHead>
-            <TableHead className="min-w-[5.5rem] text-right">{hr.table.total}</TableHead>
-            <TableHead className="min-w-[6rem]">{hr.table.paymentDate}</TableHead>
-            <TableHead className="min-w-[12rem] whitespace-normal">
+            <TableHead className={`min-w-[5.5rem] text-right ${invoiceShadeClass}`}>
+              {hr.table.total}
+            </TableHead>
+            <TableHead className={`min-w-[6rem] ${dividerClass} ${paymentShadeClass}`}>
+              {hr.table.paymentDate}
+            </TableHead>
+            <TableHead className={`min-w-[12rem] whitespace-normal ${paymentShadeClass}`}>
               {hr.table.paymentClient}
             </TableHead>
-            <TableHead className="min-w-[5.5rem] text-right">{hr.table.amount}</TableHead>
-            <TableHead className="min-w-[12rem] whitespace-normal">
+            <TableHead className={`min-w-[5.5rem] text-right ${paymentShadeClass}`}>
+              {hr.table.amount}
+            </TableHead>
+            <TableHead className={`min-w-[12rem] whitespace-normal ${paymentShadeClass}`}>
               {hr.table.paymentDescription}
             </TableHead>
             <TableHead className="sticky right-0 min-w-[7.5rem] bg-background shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.12)]">
@@ -144,7 +161,7 @@ export function MatchTable({
               `${record.invoice?.id ?? "no-inv"}-${record.payment?.id ?? "no-pay"}-${index}`;
 
             return (
-              <TableRow key={key}>
+              <TableRow key={key} className={showSectionShading ? "group" : undefined}>
                 <TableCell className="whitespace-normal">
                   <StatusBadge status={record.matchStatus} />
                   {record.confidence !== null && record.matchStatus === "auto" && (
@@ -156,24 +173,28 @@ export function MatchTable({
                     <MatchReasons reasons={record.matchReasons} />
                   )}
                 </TableCell>
-                <TableCell className="font-mono text-sm">
+                <TableCell className={`font-mono text-sm ${invoiceShadeClass}`}>
                   {record.invoice?.invoiceNumber ?? "—"}
                 </TableCell>
-                <TableCell>{formatDate(record.invoice?.invoiceDate)}</TableCell>
-                <TableCell className="whitespace-normal break-words">
+                <TableCell className={invoiceShadeClass}>
+                  {formatDate(record.invoice?.invoiceDate)}
+                </TableCell>
+                <TableCell className={`whitespace-normal break-words ${invoiceShadeClass}`}>
                   {record.invoice?.client ?? "—"}
                 </TableCell>
-                <TableCell className="text-right font-medium tabular-nums">
+                <TableCell className={`text-right font-medium tabular-nums ${invoiceShadeClass}`}>
                   {formatAmount(record.invoice?.total)}
                 </TableCell>
-                <TableCell>{formatDate(record.payment?.paymentDate)}</TableCell>
-                <TableCell className="whitespace-normal break-words">
+                <TableCell className={`${dividerClass} ${paymentShadeClass}`}>
+                  {formatDate(record.payment?.paymentDate)}
+                </TableCell>
+                <TableCell className={`whitespace-normal break-words ${paymentShadeClass}`}>
                   {record.payment?.client ?? "—"}
                 </TableCell>
-                <TableCell className="text-right font-medium tabular-nums">
+                <TableCell className={`text-right font-medium tabular-nums ${paymentShadeClass}`}>
                   {formatAmount(record.payment?.amount)}
                 </TableCell>
-                <TableCell className="whitespace-normal break-words">
+                <TableCell className={`whitespace-normal break-words ${paymentShadeClass}`}>
                   {record.payment?.description ?? "—"}
                 </TableCell>
                 <TableCell className="sticky right-0 bg-background shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.12)]">
@@ -225,11 +246,13 @@ export function MatchTable({
               <TableCell colSpan={4} className="text-right font-semibold">
                 {hr.table.footerTotal}
               </TableCell>
-              <TableCell className="text-right font-bold tabular-nums">
+              <TableCell className={`text-right font-bold tabular-nums ${invoiceShadeClass}`}>
                 {showInvoiceTotal ? formatAmount(invoiceTotal) : "—"}
               </TableCell>
               <TableCell colSpan={2} />
-              <TableCell className="text-right font-bold tabular-nums">
+              <TableCell
+                className={`text-right font-bold tabular-nums ${dividerClass} ${paymentShadeClass}`}
+              >
                 {showPaymentTotal ? formatAmount(paymentTotal) : "—"}
               </TableCell>
               <TableCell />
