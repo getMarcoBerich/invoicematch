@@ -28,6 +28,14 @@ export const hr = {
     deleteAllSessionsCancel: "Odustani",
     deleteAllSessionsFailed: "Brisanje sesija nije uspjelo",
     deletingSessions: "Brisanje…",
+    formatExample: {
+      title: "Primjer formata tablice",
+      description:
+        "Računi i uplate moraju biti u istom redu, jedan pored drugog. Red zaglavlja mora sadržavati „Broj” i „Iznos”.",
+      invoicesSection: "Računi (lijevo)",
+      paymentsSection: "Uplate (desno)",
+      note: "Stupci između sekcija mogu biti prazni. Osnovica i PDV nisu potrebni — za uparivanje se koristi TOTAL. Aplikacija automatski prepoznaje stupce prema zaglavlju.",
+    },
   },
   workspace: {
     loadFailed: "Učitavanje sesije nije uspjelo",

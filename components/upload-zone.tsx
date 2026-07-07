@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { hr } from "@/lib/i18n/hr";
 import { RecentSessions } from "@/components/recent-sessions";
+import { FormatExample } from "@/components/format-example";
 import { importExcelFile } from "@/lib/services/session";
 
 type ImportResult = {
@@ -95,6 +96,8 @@ export function UploadZone() {
           disabled={loading}
         />
       </div>
+
+      <FormatExample />
 
       {error && (
         <Card className="border-destructive">

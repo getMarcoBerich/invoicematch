@@ -52,8 +52,8 @@ Podaci (sesije, uparivanja, ključevi platioca) spremaju se **u pregledniku** na
 ## Korištenje
 
 1. Učitaj `.xlsx` datoteku s KARTICA rasporedom:
-   - **Stupci A–H:** Broj, Datum, Klijent, Osnovica, PDV, TOTAL (računi)
-   - **Stupci K–N:** Datum, iznos, Klijent, opis plaćanja (bankovne uplate)
+   - **Računi:** Broj, Datum, Klijent, TOTAL (Osnovica i PDV su opcionalni)
+   - **Uplate:** Datum, Iznos, Klijent, opis plaćanja
 2. Pregledaj sažetak uvoza i otvori radni prostor.
 3. Pokreni automatsko uparivanje, pregledavaj uparene i neuparene zapise.
 4. Ručno poveži neuparene stavke ili promijeni pogrešna uparivanja.
