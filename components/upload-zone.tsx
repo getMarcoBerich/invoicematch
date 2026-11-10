@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { hr } from "@/lib/i18n/hr";
 import { RecentSessions } from "@/components/recent-sessions";
 import { FormatExample } from "@/components/format-example";
+import { UsageGuide } from "@/components/usage-guide";
 import { importExcelFile, renameSession } from "@/lib/services/session";
 
 type ImportResult = {
@@ -198,6 +199,8 @@ export function UploadZone() {
       )}
 
       <RecentSessions refreshToken={sessionsRefreshToken} />
+
+      <UsageGuide />
     </div>
   );
 }

@@ -38,6 +38,39 @@ export const hr = {
       paymentsSection: "Uplate (desno)",
       note: "Stupci između sekcija mogu biti prazni. Osnovica i PDV nisu potrebni, za uparivanje se koristi TOTAL. Aplikacija automatski prepoznaje stupce prema zaglavlju.",
     },
+    usageGuide: {
+      title: "Kako koristiti aplikaciju",
+      description:
+        "Kratki vodič od uvoza Excel datoteke do pregleda i izvoza uparenih zapisa.",
+      steps: [
+        {
+          title: "Pripremi Excel",
+          body: "Računi idu lijevo, bankovne uplate desno, u istom retku. Zaglavlje mora imati stupce poput Broj i Iznos. Osnovica i PDV nisu obavezni — uparivanje koristi ukupni iznos (TOTAL).",
+        },
+        {
+          title: "Uvezi datoteku",
+          body: "Povuci .xlsx datoteku ili je odaberi. Po želji preimenuj sesiju, zatim klikni Započni sesiju. Sve se sprema u ovaj preglednik, ne na poslužitelj.",
+        },
+        {
+          title: "Pokreni automatsko uparivanje",
+          body: "U radnom prostoru klikni Automatsko uparivanje. Aplikacija povezuje račune i uplate prema iznosu, broju računa u opisu, nazivu klijenta i datumu.",
+        },
+        {
+          title: "Pregledaj kartice",
+          body: "Sve pokazuje obje strane. Upareno su već povezani parovi. Neupareni računi i Neuparene uplate su zapisi koje treba ručno povezati ili ostaviti otvorene.",
+        },
+        {
+          title: "Ručno poveži ili promijeni",
+          body: "Na neuparenom retku klikni Poveži i odaberi par. Na uparenom retku možeš Razdvojiti ili Promijeniti par. Filteri pomažu pri pretrazi po klijentu, iznosu ili datumu.",
+        },
+        {
+          title: "Ključevi platioca i izvoz",
+          body: "Ako isti platitelj ima različita imena na računu i izvodu, spoji ih istim ključem platioca. Kad završiš, izvezi sve ili trenutni prikaz u CSV.",
+        },
+      ],
+      privacy:
+        "Sesije ostaju samo u ovom pregledniku. Brisanje podataka preglednika ili korištenje drugog uređaja znači da sesija neće biti vidljiva.",
+    },
   },
   workspace: {
     loadFailed: "Učitavanje sesije nije uspjelo",
