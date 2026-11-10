@@ -35,6 +35,8 @@ jobs:
         run: npm ci
 
       - name: Build Next.js application
+        env:
+          NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
         run: npm run build
 
       - name: Upload GitHub Pages artifact
