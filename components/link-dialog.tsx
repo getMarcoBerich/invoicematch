@@ -567,7 +567,14 @@ export function LinkDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[90vh] w-[min(56rem,calc(100%-2rem))] max-w-none flex-col overflow-hidden sm:max-w-none">
+      <DialogContent
+        className={cn(
+          "flex max-h-[90vh] max-w-none flex-col overflow-hidden sm:max-w-none",
+          mode === "override"
+            ? "w-[min(100.8rem,calc(100%-2rem))]"
+            : "w-[min(56rem,calc(100%-2rem))]",
+        )}
+      >
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>

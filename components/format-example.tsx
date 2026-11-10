@@ -80,7 +80,7 @@ export function FormatExample() {
           </span>
         </div>
 
-        <div className="overflow-x-auto rounded-lg border">
+        <div className="overflow-x-auto rounded-lg border [&_[data-slot=table-cell]]:align-middle [&_[data-slot=table-head]]:align-middle">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
@@ -97,7 +97,7 @@ export function FormatExample() {
                 {columns.map((col) => (
                   <TableHead
                     key={`header-${col.key}`}
-                    className={`px-2 text-xs ${sectionClass(col.section)}`}
+                    className={`px-2 text-center text-xs ${sectionClass(col.section)}`}
                   >
                     {col.label || "—"}
                   </TableHead>
@@ -110,7 +110,7 @@ export function FormatExample() {
                   {row.map((value, colIndex) => (
                     <TableCell
                       key={`${rowIndex}-${colIndex}`}
-                      className={`px-2 text-xs ${cellClass(columns[colIndex].section)} ${
+                      className={`px-2 text-center text-xs ${cellClass(columns[colIndex].section)} ${
                         colIndex === 2 || colIndex === 8 ? "max-w-[9rem] truncate" : ""
                       } ${colIndex === 9 ? "max-w-[12rem] truncate" : ""}`}
                     >

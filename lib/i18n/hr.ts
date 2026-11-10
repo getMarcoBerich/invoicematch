@@ -102,6 +102,8 @@ export const hr = {
     minConfidence: "Min. pouzdanost %",
   },
   table: {
+    sectionInvoices: "Računi",
+    sectionPayments: "Uplate",
     statusAuto: "Automatski",
     statusManual: "Ručno",
     statusOverridden: "Promijenjeno",

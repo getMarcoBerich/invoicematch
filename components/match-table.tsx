@@ -44,6 +44,12 @@ function showTableTotals(tabView: TabView | undefined) {
   );
 }
 
+function showSectionDivider(tabView: TabView | undefined) {
+  return tabView === "all" || tabView === "matched";
+}
+
+const PAYMENT_DIVIDER = "border-l-2 border-border";
+
 function StatusBadge({ status }: { status: RecordRow["matchStatus"] }) {
   const variants: Record<
     RecordRow["matchStatus"],
@@ -121,29 +127,72 @@ export function MatchTable({
   const invoiceTotal = sumInvoiceTotals(records);
   const paymentTotal = sumPaymentAmounts(records);
   const showTotals = showTableTotals(tabView);
+  const showDivider = showSectionDivider(tabView);
   const showInvoiceTotal =
     tabView === "matched" || tabView === "unmatched-invoices";
   const showPaymentTotal =
     tabView === "matched" || tabView === "unmatched-payments";
 
   return (
-    <div className="rounded-md border [&_[data-slot=table-cell]]:px-1.5 [&_[data-slot=table-cell]]:py-1 [&_[data-slot=table-head]]:h-8 [&_[data-slot=table-head]]:px-1.5">
+    <div className="rounded-md border [&_[data-slot=table-cell]]:align-middle [&_[data-slot=table-cell]]:px-1.5 [&_[data-slot=table-cell]]:py-1.5 [&_[data-slot=table-head]]:h-8 [&_[data-slot=table-head]]:align-middle [&_[data-slot=table-head]]:px-1.5">
       <Table>
         <TableHeader>
+          {showDivider && (
+            <TableRow className="border-b-0 hover:bg-transparent">
+              <TableHead className="h-7 bg-background" />
+              <TableHead
+                colSpan={4}
+                className="h-7 bg-sky-500/10 text-center text-[11px] font-semibold uppercase tracking-wide text-sky-900 dark:text-sky-100"
+              >
+                {hr.table.sectionInvoices}
+              </TableHead>
+              <TableHead
+                colSpan={4}
+                className={`h-7 bg-amber-500/10 text-center text-[11px] font-semibold uppercase tracking-wide text-amber-900 dark:text-amber-100 ${PAYMENT_DIVIDER}`}
+              >
+                {hr.table.sectionPayments}
+              </TableHead>
+              <TableHead className="sticky right-0 h-7 bg-background shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.12)]" />
+            </TableRow>
+          )}
           <TableRow>
-            <TableHead className="min-w-[7.5rem] whitespace-normal">{hr.table.status}</TableHead>
-            <TableHead className="min-w-[6rem]">{hr.table.invoiceNumber}</TableHead>
-            <TableHead className="min-w-[6rem]">{hr.table.invoiceDate}</TableHead>
-            <TableHead className="min-w-[12rem] whitespace-normal">
+            <TableHead
+              className={`min-w-[7.5rem] whitespace-normal ${showDivider ? "bg-background" : ""}`}
+            >
+              {hr.table.status}
+            </TableHead>
+            <TableHead className={`min-w-[6rem] ${showDivider ? "bg-sky-500/5" : ""}`}>
+              {hr.table.invoiceNumber}
+            </TableHead>
+            <TableHead className={`min-w-[6rem] ${showDivider ? "bg-sky-500/5" : ""}`}>
+              {hr.table.invoiceDate}
+            </TableHead>
+            <TableHead
+              className={`min-w-[12rem] whitespace-normal ${showDivider ? "bg-sky-500/5" : ""}`}
+            >
               {hr.table.invoiceClient}
             </TableHead>
-            <TableHead className="min-w-[5.5rem] text-right">{hr.table.total}</TableHead>
-            <TableHead className="min-w-[6rem]">{hr.table.paymentDate}</TableHead>
-            <TableHead className="min-w-[12rem] whitespace-normal">
+            <TableHead
+              className={`min-w-[5.5rem] text-right align-middle ${showDivider ? "bg-sky-500/5" : ""}`}
+            >
+              {hr.table.total}
+            </TableHead>
+            <TableHead
+              className={`min-w-[6rem] ${showDivider ? `bg-amber-500/5 ${PAYMENT_DIVIDER}` : ""}`}
+            >
+              {hr.table.paymentDate}
+            </TableHead>
+            <TableHead className={`min-w-[12rem] whitespace-normal ${showDivider ? "bg-amber-500/5" : ""}`}>
               {hr.table.paymentClient}
             </TableHead>
-            <TableHead className="min-w-[5.5rem] text-right">{hr.table.amount}</TableHead>
-            <TableHead className="min-w-[12rem] whitespace-normal">
+            <TableHead
+              className={`min-w-[5.5rem] text-right align-middle ${showDivider ? "bg-amber-500/5" : ""}`}
+            >
+              {hr.table.amount}
+            </TableHead>
+            <TableHead
+              className={`min-w-[12rem] whitespace-normal ${showDivider ? "bg-amber-500/5" : ""}`}
+            >
               {hr.table.paymentDescription}
             </TableHead>
             <TableHead className="sticky right-0 min-w-[7.5rem] bg-background shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.12)]">
@@ -159,7 +208,7 @@ export function MatchTable({
 
             return (
               <TableRow key={key}>
-                <TableCell className="whitespace-normal align-top">
+                <TableCell className="whitespace-normal">
                   <StatusBadge status={record.matchStatus} />
                   {record.confidence !== null && record.matchStatus === "auto" && (
                     <div className="mt-1 text-xs text-muted-foreground">
@@ -170,28 +219,42 @@ export function MatchTable({
                     <MatchReasons reasons={record.matchReasons} />
                   )}
                 </TableCell>
-                <TableCell className="font-mono text-sm">
+                <TableCell className={`font-mono text-sm ${showDivider ? "bg-sky-500/5" : ""}`}>
                   {record.invoice?.invoiceNumber ?? "—"}
                 </TableCell>
-                <TableCell>{formatDate(record.invoice?.invoiceDate)}</TableCell>
-                <TableCell className="whitespace-normal break-words align-top">
+                <TableCell className={showDivider ? "bg-sky-500/5" : ""}>
+                  {formatDate(record.invoice?.invoiceDate)}
+                </TableCell>
+                <TableCell
+                  className={`whitespace-normal break-words ${showDivider ? "bg-sky-500/5" : ""}`}
+                >
                   {record.invoice?.client ?? "—"}
                 </TableCell>
-                <TableCell className="text-right font-medium tabular-nums">
+                <TableCell
+                  className={`text-right font-medium tabular-nums ${showDivider ? "bg-sky-500/5" : ""}`}
+                >
                   {formatAmount(record.invoice?.total)}
                 </TableCell>
-                <TableCell>{formatDate(record.payment?.paymentDate)}</TableCell>
-                <TableCell className="whitespace-normal break-words align-top">
+                <TableCell className={showDivider ? `bg-amber-500/5 ${PAYMENT_DIVIDER}` : ""}>
+                  {formatDate(record.payment?.paymentDate)}
+                </TableCell>
+                <TableCell
+                  className={`whitespace-normal break-words ${showDivider ? "bg-amber-500/5" : ""}`}
+                >
                   {record.payment?.client ?? "—"}
                 </TableCell>
-                <TableCell className="text-right font-medium tabular-nums">
+                <TableCell
+                  className={`text-right font-medium tabular-nums ${showDivider ? "bg-amber-500/5" : ""}`}
+                >
                   {formatAmount(record.payment?.amount)}
                 </TableCell>
-                <TableCell className="whitespace-normal break-words align-top">
+                <TableCell
+                  className={`whitespace-normal break-words ${showDivider ? "bg-amber-500/5" : ""}`}
+                >
                   {record.payment?.description ?? "—"}
                 </TableCell>
-                <TableCell className="sticky right-0 bg-background align-top shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.12)]">
-                  <div className="flex flex-col gap-1">
+                <TableCell className="sticky right-0 bg-background shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.12)]">
+                  <div className="flex flex-col items-start justify-center gap-1">
                     {record.invoice && !record.payment && onLinkInvoice && (
                       <Button
                         variant="outline"
@@ -239,14 +302,18 @@ export function MatchTable({
               <TableCell colSpan={4} className="text-right font-semibold">
                 {hr.table.footerTotal}
               </TableCell>
-              <TableCell className="text-right font-bold tabular-nums">
+              <TableCell
+                className={`text-right font-bold tabular-nums ${showDivider ? "bg-sky-500/5" : ""}`}
+              >
                 {showInvoiceTotal ? formatAmount(invoiceTotal) : "—"}
               </TableCell>
-              <TableCell colSpan={2} />
-              <TableCell className="text-right font-bold tabular-nums">
+              <TableCell colSpan={2} className={showDivider ? `bg-amber-500/5 ${PAYMENT_DIVIDER}` : ""} />
+              <TableCell
+                className={`text-right font-bold tabular-nums ${showDivider ? "bg-amber-500/5" : ""}`}
+              >
                 {showPaymentTotal ? formatAmount(paymentTotal) : "—"}
               </TableCell>
-              <TableCell />
+              <TableCell className={showDivider ? "bg-amber-500/5" : ""} />
               <TableCell className="sticky right-0 bg-muted/50 shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.12)]" />
             </TableRow>
           </TableFooter>

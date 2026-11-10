@@ -27,6 +27,7 @@ import { runAutoMatch, unlinkMatch } from "@/lib/matching/engine";
 import { getSessionClientKeys } from "@/lib/services/client-keys";
 import { getSessionDisplayName, getSessionRecords } from "@/lib/services/session";
 import type { RecordRow } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 type SessionData = {
   session: { id: string; filename: string; name: string; importedAt: string | Date };
@@ -62,6 +63,7 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
   const [tab, setTab] = useState<TabView>("all");
   const [dialog, setDialog] = useState<DialogState>(null);
   const [matching, setMatching] = useState(false);
+  const [matchActivated, setMatchActivated] = useState(false);
   const [payerKeyMap, setPayerKeyMap] = useState<PayerKeyMap>(new Map());
   const [renameOpen, setRenameOpen] = useState(false);
 
@@ -88,7 +90,14 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (data && data.stats.matched > 0) {
+      setMatchActivated(true);
+    }
+  }, [data]);
+
   const handleRunMatch = async () => {
+    setMatchActivated(true);
     setMatching(true);
     const started = Date.now();
     try {
@@ -149,6 +158,7 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
   };
 
   const displayName = getSessionDisplayName(data.session);
+  const compactMatchButton = matchActivated || matching;
 
   return (
     <div className="space-y-2">
@@ -182,15 +192,20 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-1.5">
           <Button
-            size="lg"
-            className="gap-2 px-4 font-semibold shadow-sm"
+            size={compactMatchButton ? "sm" : "lg"}
+            className={cn(
+              "h-auto gap-2 font-semibold transition-all",
+              compactMatchButton
+                ? "px-3 py-2 text-sm shadow-sm"
+                : "gap-2.5 px-8 py-4 text-base font-bold shadow-md sm:px-10 sm:py-5 sm:text-lg",
+            )}
             onClick={handleRunMatch}
             disabled={matching}
           >
             {matching ? (
               <Loader2 className="size-4 animate-spin" />
             ) : (
-              <RefreshCw className="size-4" />
+              <RefreshCw className={compactMatchButton ? "size-4" : "size-5"} />
             )}
             {matching ? hr.workspace.matchingInProgress : hr.workspace.rerunMatch}
           </Button>
