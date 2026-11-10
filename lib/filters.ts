@@ -128,6 +128,22 @@ export function filterRecords(
   return filtered;
 }
 
+export function sumInvoiceTotals(records: RecordRow[]) {
+  return records.reduce((sum, r) => sum + (r.invoice?.total ?? 0), 0);
+}
+
+export function sumPaymentAmounts(records: RecordRow[]) {
+  return records.reduce((sum, r) => sum + Math.abs(r.payment?.amount ?? 0), 0);
+}
+
+export function countInvoices(records: RecordRow[]) {
+  return records.filter((r) => r.invoice).length;
+}
+
+export function countPayments(records: RecordRow[]) {
+  return records.filter((r) => r.payment).length;
+}
+
 export function collectClients(records: RecordRow[]): string[] {
   const set = new Set<string>();
   for (const r of records) {

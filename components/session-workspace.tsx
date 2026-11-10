@@ -17,7 +17,11 @@ import {
   buildPayerKeyMapFromApi,
   collectClients,
   collectPayerKeys,
+  countInvoices,
+  countPayments,
   filterRecords,
+  sumInvoiceTotals,
+  sumPaymentAmounts,
   type TabView,
 } from "@/lib/filters";
 import { buildRecordsCsv, downloadCsvFile, recordsCsvFilename } from "@/lib/export/csv";
@@ -146,6 +150,10 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
   const payerKeys = collectPayerKeys(data.records, payerKeyMap);
   const filteredRecords = filterRecords(data.records, filters, tab, payerKeyMap);
   const filteredCount = filteredRecords.length;
+  const visibleInvoiceTotal = sumInvoiceTotals(filteredRecords);
+  const visiblePaymentTotal = sumPaymentAmounts(filteredRecords);
+  const visibleInvoiceCount = countInvoices(filteredRecords);
+  const visiblePaymentCount = countPayments(filteredRecords);
 
   const handleExportAll = () => {
     const csv = buildRecordsCsv(data.records);
@@ -224,13 +232,13 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
         {[
           {
             label: hr.workspace.stats.totalInvoiced,
-            value: formatAmount(data.stats.totalInvoiceAmount),
-            sub: hr.workspace.stats.invoicesCount(data.stats.totalInvoices),
+            value: formatAmount(visibleInvoiceTotal),
+            sub: hr.workspace.stats.invoicesCount(visibleInvoiceCount),
           },
           {
             label: hr.workspace.stats.totalPaid,
-            value: formatAmount(data.stats.totalPaymentAmount),
-            sub: hr.workspace.stats.paymentsCount(data.stats.totalPayments),
+            value: formatAmount(visiblePaymentTotal),
+            sub: hr.workspace.stats.paymentsCount(visiblePaymentCount),
           },
         ].map((s) => (
           <Card key={s.label} size="sm" className="border-primary/20 bg-primary/5 py-0">
