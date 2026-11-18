@@ -205,6 +205,11 @@ export function MatchTable({
                 </TableCell>
                 <TableCell className={`text-right font-medium tabular-nums ${invoiceShadeClass}`}>
                   {formatAmount(record.invoice?.total)}
+                  {record.invoice && (record.invoice.openAmount ?? 0) > 0.01 && record.payment && (
+                    <div className="text-xs text-destructive">
+                      {hr.ledger.openAmount} {formatAmount(record.invoice.openAmount)}
+                    </div>
+                  )}
                 </TableCell>
                 <TableCell className={`${dividerClass} ${paymentShadeClass}`}>
                   {formatDate(record.payment?.paymentDate)}
@@ -213,31 +218,43 @@ export function MatchTable({
                   {record.payment?.client ?? "—"}
                 </TableCell>
                 <TableCell className={`text-right font-medium tabular-nums ${paymentShadeClass}`}>
-                  {formatAmount(record.payment?.amount)}
+                  {formatAmount(record.allocatedAmount ?? record.payment?.amount)}
+                  {record.payment &&
+                    record.allocatedAmount != null &&
+                    Math.abs(Math.abs(record.payment.amount) - record.allocatedAmount) > 0.01 && (
+                      <div className="text-xs text-muted-foreground">
+                        {formatAmount(record.payment.amount)}
+                      </div>
+                    )}
                 </TableCell>
                 <TableCell className={`whitespace-normal break-words ${paymentShadeClass}`}>
                   {record.payment?.description ?? "—"}
                 </TableCell>
                 <TableCell className="sticky right-0 bg-background shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.12)]">
                   <div className="flex flex-col items-start justify-center gap-1">
-                    {record.invoice && !record.payment && onLinkInvoice && (
+                    {record.invoice &&
+                      onLinkInvoice &&
+                      (record.invoice.openAmount ?? (record.payment ? 0 : record.invoice.total)) > 0.01 && (
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => onLinkInvoice(record.invoice!.id)}
                       >
                         <Link2 className="size-3" />
-                        {hr.table.link}
+                        {record.payment ? hr.ledger.linkOpen : hr.table.link}
                       </Button>
                     )}
-                    {record.payment && !record.invoice && onLinkPayment && (
+                    {record.payment &&
+                      onLinkPayment &&
+                      (record.payment.openAmount ?? (record.invoice ? 0 : Math.abs(record.payment.amount))) >
+                        0.01 && (
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => onLinkPayment(record.payment!.id)}
                       >
                         <Link2 className="size-3" />
-                        {hr.table.link}
+                        {record.invoice ? hr.ledger.linkOpen : hr.table.link}
                       </Button>
                     )}
                     {record.matchId && onUnlink && (

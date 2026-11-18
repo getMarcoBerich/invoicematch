@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Clock, FileSpreadsheet, Loader2, Pencil, Trash2 } from "lucide-react";
+import { ChevronRight, Clock, FileSpreadsheet, Loader2, Pencil, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -17,6 +17,7 @@ import { formatDateTime } from "@/lib/format";
 import { hr } from "@/lib/i18n/hr";
 import { getSessionDisplayName } from "@/lib/session-name";
 import { deleteAllSessions, listSessionSummaries } from "@/lib/services/session";
+import { importSessionBundle } from "@/lib/services/session-bundle";
 import { RenameSessionDialog } from "@/components/rename-session-dialog";
 
 type SessionSummary = {
@@ -41,6 +42,7 @@ export function RecentSessions({ refreshToken = 0 }: RecentSessionsProps) {
   const [error, setError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<SessionSummary | null>(null);
+  const [importing, setImporting] = useState(false);
 
   const loadSessions = useCallback(async () => {
     setLoading(true);
@@ -76,6 +78,21 @@ export function RecentSessions({ refreshToken = 0 }: RecentSessionsProps) {
     void loadSessions();
   }, [loadSessions, refreshToken]);
 
+  const importBundle = async (file: File) => {
+    setImporting(true);
+    setError(null);
+    try {
+      const parsed = JSON.parse(await file.text()) as unknown;
+      const ids = await importSessionBundle(parsed);
+      await loadSessions();
+      if (ids.length === 1) router.push(`/session/?id=${ids[0]}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : hr.upload.importSessionFailed);
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <>
       <Card>
@@ -89,17 +106,39 @@ export function RecentSessions({ refreshToken = 0 }: RecentSessionsProps) {
               {loading ? "…" : sessions.length > 0 ? hr.upload.recentSessionsHint : null}
             </CardDescription>
           </div>
-          {!loading && sessions.length > 0 && (
+          <div className="flex shrink-0 flex-wrap justify-end gap-2">
             <Button
               variant="outline"
               size="sm"
-              className="shrink-0 text-destructive hover:text-destructive"
-              onClick={() => setConfirmOpen(true)}
+              disabled={importing}
+              onClick={() => document.getElementById("session-bundle-input")?.click()}
             >
-              <Trash2 className="size-4" />
-              {hr.upload.deleteAllSessions}
+              {importing ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+              {hr.upload.importSession}
             </Button>
-          )}
+            <input
+              id="session-bundle-input"
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (file) void importBundle(file);
+              }}
+            />
+            {!loading && sessions.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0 text-destructive hover:text-destructive"
+                onClick={() => setConfirmOpen(true)}
+              >
+                <Trash2 className="size-4" />
+                {hr.upload.deleteAllSessions}
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (

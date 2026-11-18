@@ -18,6 +18,7 @@ export type RecordRow = {
     baseAmount: number;
     vat: number;
     total: number;
+    openAmount?: number;
   } | null;
   payment: {
     id: string;
@@ -25,5 +26,7 @@ export type RecordRow = {
     amount: number;
     client: string;
     description: string;
+    openAmount?: number;
   } | null;
+  allocatedAmount?: number | null;
 };

@@ -2,6 +2,7 @@ import Fuse from "fuse.js";
 import { differenceInDays, parseISO } from "date-fns";
 import type { MatchReason } from "@/lib/types";
 import { hr } from "@/lib/i18n/hr";
+import { isNearAmount, nearAmountLimit, OPEN_TOLERANCE } from "./allocate";
 import { invoiceNumbersMatch } from "./invoice-number";
 
 export type MatchCandidate = {
@@ -36,7 +37,6 @@ const WEIGHTS = {
   date: 5,
 } as const;
 
-const AMOUNT_TOLERANCE = 0.01;
 const DATE_WINDOW_DAYS = 90;
 const CLIENT_FUSE_THRESHOLD = 0.15;
 
@@ -44,8 +44,9 @@ export function scorePair(
   invoice: ScoringInvoice,
   payment: ScoringPayment,
 ): MatchCandidate | null {
-  const amountDiff = Math.abs(invoice.total - Math.abs(payment.amount));
-  if (amountDiff > AMOUNT_TOLERANCE) return null;
+  const paid = Math.abs(payment.amount);
+  const amountDiff = Math.abs(invoice.total - paid);
+  if (!isNearAmount(invoice.total, paid)) return null;
 
   const daysApart = Math.abs(
     differenceInDays(parseISO(invoice.invoiceDate), parseISO(payment.paymentDate)),
@@ -55,7 +56,7 @@ export function scorePair(
   const reasons: MatchReason[] = [];
   let confidence = 0;
 
-  const amountScore = amountDiff <= AMOUNT_TOLERANCE ? 1 : 0;
+  const amountScore = amountDiff <= OPEN_TOLERANCE ? 1 : 0.85;
   confidence += amountScore * WEIGHTS.amount;
   reasons.push({
     signal: "amount",
@@ -63,11 +64,8 @@ export function scorePair(
     score: amountScore,
     detail:
       amountScore === 1
-        ? hr.match.amountMatch(
-            invoice.total.toFixed(2),
-            Math.abs(payment.amount).toFixed(2),
-          )
-        : hr.match.amountDiff(amountDiff.toFixed(2)),
+        ? hr.match.amountMatch(invoice.total.toFixed(2), paid.toFixed(2))
+        : hr.match.nearAmount(amountDiff.toFixed(2), nearAmountLimit(invoice.total, paid).toFixed(2)),
   });
 
   const invoiceNumMatch = invoiceNumbersMatch(invoice.invoiceNumber, payment.description);

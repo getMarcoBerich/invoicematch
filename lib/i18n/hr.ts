@@ -29,6 +29,8 @@ export const hr = {
     deleteAllSessionsConfirm: "Obriši sve",
     deleteAllSessionsCancel: "Odustani",
     deleteAllSessionsFailed: "Brisanje sesija nije uspjelo",
+    importSession: "Uvezi sesiju",
+    importSessionFailed: "Uvoz sesije nije uspio",
     deletingSessions: "Brisanje…",
     formatExample: {
       title: "Primjer formata tablice",
@@ -88,9 +90,19 @@ export const hr = {
     sourceFile: (filename: string) => `Datoteka: ${filename}`,
     rerunMatch: "Automatsko uparivanje",
     matchingInProgress: "Uparivanje u tijeku…",
+    unlinkAll: "Razdvoji sve",
+    unlinkingAll: "Razdvajanje u tijeku…",
+    unlinkAllTitle: "Razdvoji sva uparivanja?",
+    unlinkVisibleTitle: "Razdvoji vidljiva uparivanja?",
+    unlinkAllDescription: (count: number, total: number) =>
+      count === total
+        ? `Razdvojit će se svih ${count} uparivanja u sesiji. Računi i uplate ostaju.`
+        : `Razdvojit će se ${count} vidljivih uparivanja od ${total}. Ostala uparivanja ostaju.`,
+    unlinkAllConfirm: "Razdvoji sve",
     exportCsvAll: "Izvezi sve",
     exportCsvView: "Izvezi prikaz",
     exportExcel: "Izvezi Excel",
+    exportSession: "Izvezi sesiju",
     clientKeys: "Ključevi platioca",
     stats: {
       invoices: "Računi",
@@ -176,6 +188,8 @@ export const hr = {
     overrideTitle: "Promijeni uparivanje",
     linkInvoiceTitle: "Poveži račun s uplatom",
     linkPaymentTitle: "Poveži uplatu s računom",
+    linkingInvoice: "Povezuješ ovaj račun",
+    linkingPayment: "Povezuješ ovu uplatu",
     overrideDesc: "Odaberi novi par računa i uplate za zamjenu trenutnog uparivanja.",
     linkDesc: "Odaberi najboljeg kandidata s popisa ispod.",
     invoice: "Račun",
@@ -217,9 +231,16 @@ export const hr = {
     manuallyReassigned: "Promijenjeno — ručno preraspoređeno",
     amountMatch: (a: string, b: string) => `Podudaranje iznosa: ${a} = ${b}`,
     amountDiff: (d: string) => `Iznos se razlikuje za ${d}`,
+    nearAmount: (diff: string, limit: string) =>
+      `Iznos se razlikuje za ${diff}, unutar dopuštenih ${limit}`,
+    splitPayment: (numbers: string, amount: string) =>
+      `Uplata pokriva račun ${numbers} s ${amount}`,
+    partialPayment: (numbers: string, amount: string) =>
+      `Djelomična uplata ${amount} za račun ${numbers}`,
     invoiceNumFound: "Broj računa pronađen u opisu uplate",
     invoiceNumNotFound: (desc: string) => `Nema podudaranja broja računa u "${desc}"`,
     clientMatch: "Imena klijenata se podudaraju",
+    clientMismatch: "Klijenti se ne podudaraju",
     payerKeyMatch: (key: string) => `Isti ključ platioca: ${key}`,
     clientSimilarity: (n: string) => `Sličnost klijenata: ${n}%`,
     daysApart: (n: number) => `${n} dana razlike`,
@@ -247,6 +268,9 @@ export const hr = {
     saved: "Ključ spremljen",
     groups: "Grupe platioca",
     noGroups: "Svaki klijent ima vlastiti ključ. Dodijeli isti ključ više nazivima za grupiranje.",
+    suggestions: "Prijedlozi ključeva",
+    suggestionsHint: "Slični nazivi koji još ne dijele ključ.",
+    applySuggestion: "Primijeni",
     loadFailed: "Učitavanje ključeva nije uspjelo",
     saveFailed: "Spremanje ključa nije uspjelo",
     keyPlaceholder: "npr. HORWATH",
@@ -285,6 +309,9 @@ export const hr = {
     payment: "Uplata",
     debit: "Duguje",
     credit: "Potražuje",
+    openAmount: "Otvoreno",
+    daysOpen: "Dana",
+    linkOpen: "Poveži ostatak",
     close: "Zatvori",
   },
   export: {
@@ -301,6 +328,8 @@ export const hr = {
     filenamePrefix: "uparivanje-racuna",
     filenameSuffixView: "-prikaz",
     ledgerFilenamePrefix: "konto-kartice",
+    sessionBundlePrefix: "sesija",
+    sessionBundleAll: "sve",
     statusLabels: {
       auto: "Automatski",
       manual: "Ručno",

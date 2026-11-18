@@ -3,6 +3,7 @@ import {
   resolvePayerKey,
   type PayerKeyMap,
 } from "@/lib/clients/payer-keys";
+import { suggestPayerKeys } from "@/lib/clients/suggest-keys";
 import { hr } from "@/lib/i18n/hr";
 import { getDb } from "@/lib/storage/db";
 
@@ -108,16 +109,19 @@ export async function getSessionClientKeys(sessionId: string) {
     .map(([normalized, payerKey]) => ({ name: normalized, payerKey }))
     .sort((a, b) => a.name.localeCompare(b.name, "hr"));
 
+  const clientEntries = clients.map((name) => {
+    const normalized = normalizeClient(name);
+    const payerKey = map.get(normalized) ?? normalized;
+    const isCustomKey = map.has(normalized);
+    return { name, normalized, payerKey, isCustomKey };
+  });
+
   return {
-    clients: clients.map((name) => {
-      const normalized = normalizeClient(name);
-      const payerKey = map.get(normalized) ?? normalized;
-      const isCustomKey = map.has(normalized);
-      return { name, normalized, payerKey, isCustomKey };
-    }),
+    clients: clientEntries,
     groups,
     allPayerKeys,
     extraAliases,
+    suggestions: suggestPayerKeys(clientEntries),
     payerKeyMap: Object.fromEntries(map),
   };
 }

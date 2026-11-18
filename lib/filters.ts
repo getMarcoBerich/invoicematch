@@ -65,9 +65,17 @@ export function filterRecords(
   if (tab === "matched") {
     filtered = filtered.filter((r) => r.matchStatus !== "unmatched");
   } else if (tab === "unmatched-invoices") {
-    filtered = filtered.filter((r) => r.invoice && !r.payment);
+    filtered = filtered.filter((r) => {
+      if (!r.invoice) return false;
+      const open = r.invoice.openAmount ?? (r.payment ? 0 : r.invoice.total);
+      return open > 0.01;
+    });
   } else if (tab === "unmatched-payments") {
-    filtered = filtered.filter((r) => r.payment && !r.invoice);
+    filtered = filtered.filter((r) => {
+      if (!r.payment) return false;
+      const open = r.payment.openAmount ?? (r.invoice ? 0 : Math.abs(r.payment.amount));
+      return open > 0.01;
+    });
   }
 
   if (filters.status !== "all") {
@@ -133,20 +141,35 @@ export function filterRecords(
   return filtered;
 }
 
+function uniqueDocuments<T extends { id: string }>(records: RecordRow[], pick: (record: RecordRow) => T | null | undefined) {
+  const seen = new Set<string>();
+  const items: T[] = [];
+  for (const record of records) {
+    const item = pick(record);
+    if (!item || seen.has(item.id)) continue;
+    seen.add(item.id);
+    items.push(item);
+  }
+  return items;
+}
+
 export function sumInvoiceTotals(records: RecordRow[]) {
-  return records.reduce((sum, r) => sum + (r.invoice?.total ?? 0), 0);
+  return uniqueDocuments(records, (record) => record.invoice).reduce((sum, invoice) => sum + invoice.total, 0);
 }
 
 export function sumPaymentAmounts(records: RecordRow[]) {
-  return records.reduce((sum, r) => sum + Math.abs(r.payment?.amount ?? 0), 0);
+  return uniqueDocuments(records, (record) => record.payment).reduce(
+    (sum, payment) => sum + Math.abs(payment.amount),
+    0,
+  );
 }
 
 export function countInvoices(records: RecordRow[]) {
-  return records.filter((r) => r.invoice).length;
+  return uniqueDocuments(records, (record) => record.invoice).length;
 }
 
 export function countPayments(records: RecordRow[]) {
-  return records.filter((r) => r.payment).length;
+  return uniqueDocuments(records, (record) => record.payment).length;
 }
 
 export function collectClients(records: RecordRow[]): string[] {

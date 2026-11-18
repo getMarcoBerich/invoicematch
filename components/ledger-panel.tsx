@@ -45,10 +45,14 @@ export function LedgerPanel({
   ledgers,
   sessionName,
   onExportError,
+  onLinkInvoice,
+  onLinkPayment,
 }: {
   ledgers: ClientLedger[];
   sessionName: string;
   onExportError?: (message: string) => void;
+  onLinkInvoice?: (invoiceId: string) => void;
+  onLinkPayment?: (paymentId: string) => void;
 }) {
   const [openKey, setOpenKey] = useState<string | null>(null);
   const openLedger = ledgers.find((ledger) => ledger.payerKey === openKey) ?? null;
@@ -155,6 +159,8 @@ export function LedgerPanel({
         ledger={openLedger}
         sessionName={sessionName}
         onExportError={onExportError}
+        onLinkInvoice={onLinkInvoice}
+        onLinkPayment={onLinkPayment}
         onOpenChange={(open) => {
           if (!open) setOpenKey(null);
         }}
@@ -167,11 +173,15 @@ function LedgerCardDialog({
   ledger,
   sessionName,
   onExportError,
+  onLinkInvoice,
+  onLinkPayment,
   onOpenChange,
 }: {
   ledger: ClientLedger | null;
   sessionName: string;
   onExportError?: (message: string) => void;
+  onLinkInvoice?: (invoiceId: string) => void;
+  onLinkPayment?: (paymentId: string) => void;
   onOpenChange: (open: boolean) => void;
 }) {
   return (
@@ -224,6 +234,8 @@ function LedgerCardDialog({
                     <TableHead className="min-w-[6rem] text-right">{hr.ledger.debit}</TableHead>
                     <TableHead className="min-w-[6rem] text-right">{hr.ledger.credit}</TableHead>
                     <TableHead className="min-w-[6rem] text-right">{hr.ledger.balance}</TableHead>
+                    <TableHead className="min-w-[6rem] text-right">{hr.ledger.openAmount}</TableHead>
+                    <TableHead className="min-w-[4rem] text-right">{hr.ledger.daysOpen}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -261,6 +273,35 @@ function LedgerCardDialog({
                         >
                           {formatAmount(line.balance)}
                         </TableCell>
+                        <TableCell className={`text-right tabular-nums ${shade}`}>
+                          {line.openAmount > 0.01 ? (
+                            <div className="flex flex-col items-end gap-1">
+                              <span className="font-medium text-destructive">
+                                {formatAmount(line.openAmount)}
+                              </span>
+                              {((line.kind === "invoice" && onLinkInvoice) ||
+                                (line.kind === "payment" && onLinkPayment)) && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-6 px-1.5 text-xs"
+                                  onClick={() =>
+                                    line.kind === "invoice"
+                                      ? onLinkInvoice?.(line.id)
+                                      : onLinkPayment?.(line.id)
+                                  }
+                                >
+                                  {hr.ledger.linkOpen}
+                                </Button>
+                              )}
+                            </div>
+                          ) : (
+                            "—"
+                          )}
+                        </TableCell>
+                        <TableCell className={`text-right tabular-nums ${shade}`}>
+                          {line.daysOpen ?? "—"}
+                        </TableCell>
                       </TableRow>
                     );
                   })}
@@ -287,6 +328,8 @@ function LedgerCardDialog({
                     >
                       {formatAmount(ledger.balance)}
                     </TableCell>
+                    <TableCell />
+                    <TableCell />
                   </TableRow>
                 </TableFooter>
               </Table>

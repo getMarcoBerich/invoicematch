@@ -3,7 +3,7 @@ import { describe, expect, it, beforeEach } from "vitest";
 import fs from "fs";
 import path from "path";
 import { importExcelFile, getSessionRecords } from "@/lib/services/session";
-import { runAutoMatch } from "@/lib/matching/engine";
+import { runAutoMatch, unlinkAllMatches } from "@/lib/matching/engine";
 import { clearAllData } from "@/lib/storage/db";
 
 describe("Import integration", () => {
@@ -32,5 +32,19 @@ describe("Import integration", () => {
 
     const afterMatch = await getSessionRecords(result.sessionId);
     expect(afterMatch.stats.matched).toBe(matchResult.created);
+    const unique = [
+      ...new Set(afterMatch.records.flatMap((record) => (record.matchId ? [record.matchId] : []))),
+    ];
+    expect(unique).toHaveLength(matchResult.created);
+
+    await unlinkAllMatches(result.sessionId, unique.slice(0, 1));
+    const afterOne = await getSessionRecords(result.sessionId);
+    expect(afterOne.stats.matched).toBe(matchResult.created - 1);
+
+    await unlinkAllMatches(result.sessionId, unique.slice(1));
+    const afterUnlink = await getSessionRecords(result.sessionId);
+    expect(afterUnlink.stats.matched).toBe(0);
+    expect(afterUnlink.stats.totalInvoices).toBe(6);
+    expect(afterUnlink.stats.totalPayments).toBe(6);
   });
 });

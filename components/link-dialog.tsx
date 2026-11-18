@@ -17,8 +17,11 @@ import { hr } from "@/lib/i18n/hr";
 import { cn } from "@/lib/utils";
 import type { RecordRow } from "@/lib/types";
 import {
+  getLinkSource,
   getRecordsForOverride,
   getUnmatchedForLinking,
+  type LinkInvoiceSource,
+  type LinkPaymentSource,
 } from "@/lib/services/session";
 import { createManualMatch, overrideMatch } from "@/lib/matching/engine";
 
@@ -447,6 +450,45 @@ function PaymentPicker({
   );
 }
 
+function SourceSummary({ source }: { source: LinkInvoiceSource | LinkPaymentSource }) {
+  const fields =
+    source.kind === "invoice"
+      ? [
+          [hr.table.invoiceNumber, source.invoiceNumber],
+          [hr.table.invoiceDate, formatDate(source.invoiceDate)],
+          [hr.table.invoiceClient, source.client],
+          [hr.table.total, formatAmount(source.total)],
+          ...(Math.abs(source.total - source.openAmount) > 0.01
+            ? [[hr.ledger.openAmount, formatAmount(source.openAmount)]]
+            : []),
+        ]
+      : [
+          [hr.table.paymentDate, formatDate(source.paymentDate)],
+          [hr.table.paymentClient, source.client],
+          [hr.table.amount, formatAmount(source.amount)],
+          [hr.table.paymentDescription, source.description || "—"],
+          ...(Math.abs(Math.abs(source.amount) - source.openAmount) > 0.01
+            ? [[hr.ledger.openAmount, formatAmount(source.openAmount)]]
+            : []),
+        ];
+
+  return (
+    <div className="shrink-0 rounded-md border bg-muted/40 px-3 py-2">
+      <p className="text-xs font-medium text-muted-foreground">
+        {source.kind === "invoice" ? hr.dialog.linkingInvoice : hr.dialog.linkingPayment}
+      </p>
+      <dl className="mt-1 grid gap-x-4 gap-y-1 sm:grid-cols-2">
+        {fields.map(([label, value]) => (
+          <div key={label} className="min-w-0">
+            <dt className="text-[11px] text-muted-foreground">{label}</dt>
+            <dd className="truncate text-sm font-medium">{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 export function LinkDialog({
   open,
   onOpenChange,
@@ -464,6 +506,7 @@ export function LinkDialog({
   const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [source, setSource] = useState<LinkInvoiceSource | LinkPaymentSource | null>(null);
 
   const dialogKey = `${mode}-${sourceId ?? ""}-${overrideRecord?.matchId ?? ""}`;
 
@@ -476,6 +519,7 @@ export function LinkDialog({
       setLoading(true);
       setLoadError(null);
       setSubmitError(null);
+      setSource(null);
       setSelectedInvoiceId(
         mode === "link-invoice" ? (sourceId ?? null) : (overrideRecord?.invoice?.id ?? null),
       );
@@ -490,9 +534,14 @@ export function LinkDialog({
           sourceId,
           overrideRecord?.matchId ?? undefined,
         );
+        const linked =
+          sourceId && (mode === "link-invoice" || mode === "link-payment")
+            ? await getLinkSource(sessionId, sourceId, mode === "link-invoice" ? "invoice" : "payment")
+            : null;
         if (cancelled) return;
         setUnmatchedInvoices(data.unmatchedInvoices);
         setUnmatchedPayments(data.unmatchedPayments);
+        setSource(linked);
       } catch (err) {
         if (!cancelled) {
           setLoadError(err instanceof Error ? err.message : hr.dialog.loadFailed);
@@ -581,6 +630,8 @@ export function LinkDialog({
             {mode === "override" ? hr.dialog.overrideDesc : hr.dialog.linkSelectDesc}
           </DialogDescription>
         </DialogHeader>
+
+        {source ? <SourceSummary source={source} /> : null}
 
         <div className="min-h-0 flex-1 overflow-hidden">
           {loading ? (

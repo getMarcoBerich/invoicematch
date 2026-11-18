@@ -2,9 +2,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Download, Loader2, Pencil, RefreshCw } from "lucide-react";
+import { ArrowLeft, Download, Loader2, Pencil, RefreshCw, Unlink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FilterPanel, defaultFilters, type FilterState } from "@/components/filter-panel";
@@ -27,10 +35,15 @@ import {
 } from "@/lib/filters";
 import { buildRecordsCsv, downloadCsvFile, recordsCsvFilename } from "@/lib/export/csv";
 import { downloadLedgerWorkbook, ledgerXlsxFilename } from "@/lib/export/ledger-xlsx";
+import {
+  buildSessionBundle,
+  downloadJsonFile,
+  sessionBundleFilename,
+} from "@/lib/services/session-bundle";
 import { formatAmount, formatDateTime } from "@/lib/format";
 import { hr } from "@/lib/i18n/hr";
 import { buildClientLedgers, ledgerTotals } from "@/lib/ledger";
-import { runAutoMatch, unlinkMatch } from "@/lib/matching/engine";
+import { runAutoMatch, unlinkAllMatches, unlinkMatch } from "@/lib/matching/engine";
 import { getSessionClientKeys } from "@/lib/services/client-keys";
 import { getSessionDisplayName, getSessionRecords } from "@/lib/services/session";
 import type { RecordRow } from "@/lib/types";
@@ -70,6 +83,9 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
   const [tab, setTab] = useState<TabView>("all");
   const [dialog, setDialog] = useState<DialogState>(null);
   const [matching, setMatching] = useState(false);
+  const [unlinkingAll, setUnlinkingAll] = useState(false);
+  const [unlinkAllOpen, setUnlinkAllOpen] = useState(false);
+  const [unlinkIds, setUnlinkIds] = useState<string[]>([]);
   const [matchActivated, setMatchActivated] = useState(false);
   const [payerKeyMap, setPayerKeyMap] = useState<PayerKeyMap>(new Map());
   const [renameOpen, setRenameOpen] = useState(false);
@@ -128,6 +144,19 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
     }
   };
 
+  const handleUnlinkAll = async () => {
+    setUnlinkingAll(true);
+    try {
+      await unlinkAllMatches(sessionId, unlinkIds);
+      setUnlinkAllOpen(false);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : hr.workspace.unlinkFailed);
+    } finally {
+      setUnlinkingAll(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -168,6 +197,12 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
   const visiblePaymentCount = onAccountCards
     ? ledgerSummary.paymentCount
     : countPayments(filteredRecords);
+  const visibleMatchIds = onAccountCards
+    ? matchIdsForDocuments(
+        data.records,
+        new Set(ledgers.flatMap((ledger) => ledger.lines.map((line) => line.id))),
+      )
+    : matchIdsInRecords(filteredRecords);
 
   const handleExportAll = () => {
     const csv = buildRecordsCsv(data.records);
@@ -184,6 +219,15 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
     }
     const csv = buildRecordsCsv(filteredRecords);
     downloadCsvFile(csv, recordsCsvFilename(getSessionDisplayName(data.session), "view"));
+  };
+
+  const handleExportSession = () => {
+    const sessionName = getSessionDisplayName(data.session);
+    void buildSessionBundle([sessionId])
+      .then((bundle) => downloadJsonFile(bundle, sessionBundleFilename(sessionName)))
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : hr.api.exportFailed);
+      });
   };
 
   const displayName = getSessionDisplayName(data.session);
@@ -229,7 +273,7 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
                 : "gap-2.5 px-8 py-4 text-base font-bold shadow-md sm:px-10 sm:py-5 sm:text-lg",
             )}
             onClick={handleRunMatch}
-            disabled={matching}
+            disabled={matching || unlinkingAll}
           >
             {matching ? (
               <Loader2 className="size-4 animate-spin" />
@@ -238,9 +282,30 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
             )}
             {matching ? hr.workspace.matchingInProgress : hr.workspace.rerunMatch}
           </Button>
+          <Button
+            variant="outline"
+            size={compactMatchButton ? "sm" : "lg"}
+            className={cn(compactMatchButton ? "" : "px-6 py-4 text-base sm:px-8 sm:py-5 sm:text-lg")}
+            onClick={() => {
+              setUnlinkIds(visibleMatchIds);
+              setUnlinkAllOpen(true);
+            }}
+            disabled={matching || unlinkingAll || visibleMatchIds.length === 0}
+          >
+            {unlinkingAll ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Unlink className={compactMatchButton ? "size-4" : "size-5"} />
+            )}
+            {unlinkingAll ? hr.workspace.unlinkingAll : hr.workspace.unlinkAll}
+          </Button>
           <Button variant="outline" size="sm" onClick={handleExportAll}>
             <Download className="size-4" />
             {hr.workspace.exportCsvAll}
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExportSession}>
+            <Download className="size-4" />
+            {hr.workspace.exportSession}
           </Button>
           <Button
             variant="outline"
@@ -348,6 +413,8 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
                 ledgers={ledgers}
                 sessionName={displayName}
                 onExportError={(message) => setError(message)}
+                onLinkInvoice={(id) => setDialog({ mode: "link-invoice", sourceId: id })}
+                onLinkPayment={(id) => setDialog({ mode: "link-payment", sourceId: id })}
               />
             </TabsContent>
           </Tabs>
@@ -393,6 +460,47 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
           );
         }}
       />
+
+      <Dialog open={unlinkAllOpen} onOpenChange={(open) => !unlinkingAll && setUnlinkAllOpen(open)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {unlinkIds.length === data.stats.matched
+                ? hr.workspace.unlinkAllTitle
+                : hr.workspace.unlinkVisibleTitle}
+            </DialogTitle>
+            <DialogDescription>
+              {hr.workspace.unlinkAllDescription(unlinkIds.length, data.stats.matched)}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" disabled={unlinkingAll} onClick={() => setUnlinkAllOpen(false)}>
+              {hr.dialog.cancel}
+            </Button>
+            <Button variant="destructive" disabled={unlinkingAll} onClick={() => void handleUnlinkAll()}>
+              {unlinkingAll ? hr.workspace.unlinkingAll : hr.workspace.unlinkAllConfirm}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
+}
+
+function matchIdsInRecords(records: RecordRow[]): string[] {
+  return [...new Set(records.flatMap((record) => (record.matchId ? [record.matchId] : [])))];
+}
+
+function matchIdsForDocuments(records: RecordRow[], documentIds: Set<string>): string[] {
+  return [
+    ...new Set(
+      records.flatMap((record) => {
+        if (!record.matchId) return [];
+        const shown =
+          (record.invoice !== null && documentIds.has(record.invoice.id)) ||
+          (record.payment !== null && documentIds.has(record.payment.id));
+        return shown ? [record.matchId] : [];
+      }),
+    ),
+  ];
 }

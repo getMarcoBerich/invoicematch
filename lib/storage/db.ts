@@ -39,6 +39,7 @@ export type MatchRow = {
   status: "auto" | "manual" | "overridden";
   confidence: number;
   matchReasons: MatchReason[];
+  allocatedAmount?: number;
   createdAt: Date;
   active: boolean;
 };

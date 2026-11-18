@@ -93,6 +93,8 @@ function addCardSheet(workbook: ExcelJS.Workbook, ledger: ClientLedger, sheetNam
     hr.ledger.debit,
     hr.ledger.credit,
     hr.ledger.balance,
+    hr.ledger.openAmount,
+    hr.ledger.daysOpen,
   ];
   const debitCol = headers.indexOf(hr.ledger.debit) + 1;
   const creditCol = headers.indexOf(hr.ledger.credit) + 1;
@@ -131,6 +133,10 @@ function addCardSheet(workbook: ExcelJS.Workbook, ledger: ClientLedger, sheetNam
     if (line.kind === "payment") paintMoney(row.getCell(creditCol), line.credit);
     paintMoney(row.getCell(balanceCol), line.balance);
     applyBalanceFont(row.getCell(balanceCol), line.balance);
+    const openCol = headers.indexOf(hr.ledger.openAmount) + 1;
+    const daysCol = headers.indexOf(hr.ledger.daysOpen) + 1;
+    if (line.openAmount > 0.01) paintMoney(row.getCell(openCol), line.openAmount);
+    if (line.daysOpen != null) row.getCell(daysCol).value = line.daysOpen;
     const fill = line.kind === "invoice" ? INVOICE_FILL : PAYMENT_FILL;
     for (let col = 1; col <= headers.length; col++) {
       const cell = row.getCell(col);

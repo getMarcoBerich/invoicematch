@@ -31,6 +31,11 @@ type ExtraAlias = {
   payerKey: string;
 };
 
+type Suggestion = {
+  payerKey: string;
+  clients: string[];
+};
+
 type ClientKeysPanelProps = {
   sessionId: string;
   onKeysChanged?: () => void;
@@ -50,6 +55,7 @@ export function ClientKeysPanel({ sessionId, onKeysChanged }: ClientKeysPanelPro
   const [clients, setClients] = useState<ClientEntry[]>([]);
   const [groups, setGroups] = useState<PayerGroup[]>([]);
   const [extraAliases, setExtraAliases] = useState<ExtraAlias[]>([]);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [allPayerKeys, setAllPayerKeys] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
@@ -69,6 +75,7 @@ export function ClientKeysPanel({ sessionId, onKeysChanged }: ClientKeysPanelPro
       setClients(data.clients);
       setGroups(data.groups);
       setExtraAliases(data.extraAliases ?? []);
+      setSuggestions(data.suggestions ?? []);
       setAllPayerKeys(data.allPayerKeys);
       const drafts: Record<string, string> = {};
       for (const c of data.clients as ClientEntry[]) {
@@ -78,6 +85,7 @@ export function ClientKeysPanel({ sessionId, onKeysChanged }: ClientKeysPanelPro
     } catch (err) {
       setClients([]);
       setExtraAliases([]);
+      setSuggestions([]);
       setLoadError(err instanceof Error ? err.message : hr.clientKeys.loadFailed);
     } finally {
       setLoading(false);
@@ -157,6 +165,19 @@ export function ClientKeysPanel({ sessionId, onKeysChanged }: ClientKeysPanelPro
     }
   };
 
+  const applySuggestion = async (suggestion: Suggestion) => {
+    setSaving(`suggest:${suggestion.payerKey}`);
+    try {
+      for (const name of suggestion.clients) {
+        await setClientPayerKey(name, suggestion.payerKey);
+      }
+      await load();
+      onKeysChanged?.();
+    } finally {
+      setSaving(null);
+    }
+  };
+
   const resetGroup = async (group: PayerGroup) => {
     const savingId = `group:${group.payerKey}`;
     setSaving(savingId);
@@ -186,6 +207,30 @@ export function ClientKeysPanel({ sessionId, onKeysChanged }: ClientKeysPanelPro
         </h3>
         <p className="mt-1 text-xs text-muted-foreground">{hr.clientKeys.description}</p>
         {loadError ? <p className="mt-1 text-xs text-destructive">{loadError}</p> : null}
+        {suggestions.length > 0 && (
+          <div className="mt-2 space-y-1 rounded border border-dashed p-2">
+            <p className="text-xs font-medium">{hr.clientKeys.suggestions}</p>
+            <p className="text-[11px] text-muted-foreground">{hr.clientKeys.suggestionsHint}</p>
+            {suggestions.map((suggestion) => (
+              <div key={`${suggestion.payerKey}-${suggestion.clients.join("|")}`} className="flex items-start justify-between gap-2">
+                <p className="min-w-0 text-[11px] text-muted-foreground">
+                  <span className="font-medium text-foreground">{suggestion.payerKey}</span>
+                  {" · "}
+                  {suggestion.clients.join(", ")}
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 shrink-0 px-1.5 text-[11px]"
+                  disabled={saving === `suggest:${suggestion.payerKey}`}
+                  onClick={() => void applySuggestion(suggestion)}
+                >
+                  {hr.clientKeys.applySuggestion}
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="shrink-0 space-y-1">

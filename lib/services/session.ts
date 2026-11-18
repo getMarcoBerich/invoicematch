@@ -1,5 +1,6 @@
 import { parseExcelBuffer } from "@/lib/excel/parser";
 import { hr } from "@/lib/i18n/hr";
+import { isOpenAmount, openAmountFor } from "@/lib/matching/allocate";
 import { defaultSessionName, getSessionDisplayName } from "@/lib/session-name";
 import { deleteAllPayerKeys } from "@/lib/services/client-keys";
 import { getDb } from "@/lib/storage/db";
@@ -105,6 +106,24 @@ export async function getSessionRecords(sessionId: string): Promise<{
 
   const invoiceMap = new Map(sessionInvoices.map((i) => [i.id, i]));
   const paymentMap = new Map(sessionPayments.map((p) => [p.id, p]));
+  const invoiceOpen = new Map(
+    sessionInvoices.map((invoice) => [
+      invoice.id,
+      openAmountFor(
+        invoice.total,
+        activeMatches.filter((match) => match.invoiceId === invoice.id),
+      ),
+    ]),
+  );
+  const paymentOpen = new Map(
+    sessionPayments.map((payment) => [
+      payment.id,
+      openAmountFor(
+        Math.abs(payment.amount),
+        activeMatches.filter((match) => match.paymentId === payment.id),
+      ),
+    ]),
+  );
   const matchedInvoiceIds = new Set(activeMatches.map((m) => m.invoiceId));
   const matchedPaymentIds = new Set(activeMatches.map((m) => m.paymentId));
   const records: RecordRow[] = [];
@@ -117,6 +136,7 @@ export async function getSessionRecords(sessionId: string): Promise<{
     baseAmount: inv.baseAmount,
     vat: inv.vat,
     total: inv.total,
+    openAmount: invoiceOpen.get(inv.id) ?? inv.total,
   });
 
   const toPayment = (pay: (typeof sessionPayments)[0]) => ({
@@ -125,6 +145,7 @@ export async function getSessionRecords(sessionId: string): Promise<{
     amount: pay.amount,
     client: pay.client,
     description: pay.description,
+    openAmount: paymentOpen.get(pay.id) ?? Math.abs(pay.amount),
   });
 
   for (const match of activeMatches) {
@@ -135,6 +156,7 @@ export async function getSessionRecords(sessionId: string): Promise<{
       matchStatus: match.status,
       confidence: match.confidence,
       matchReasons: match.matchReasons,
+      allocatedAmount: match.allocatedAmount ?? null,
       invoice: inv ? toInvoice(inv) : null,
       payment: pay ? toPayment(pay) : null,
     });
@@ -180,8 +202,12 @@ export async function getSessionRecords(sessionId: string): Promise<{
       totalInvoiceAmount: sessionInvoices.reduce((sum, inv) => sum + inv.total, 0),
       totalPaymentAmount: sessionPayments.reduce((sum, pay) => sum + Math.abs(pay.amount), 0),
       matched,
-      unmatchedInvoices: sessionInvoices.filter((i) => !matchedInvoiceIds.has(i.id)).length,
-      unmatchedPayments: sessionPayments.filter((p) => !matchedPaymentIds.has(p.id)).length,
+      unmatchedInvoices: sessionInvoices.filter((invoice) =>
+        isOpenAmount(invoiceOpen.get(invoice.id) ?? invoice.total),
+      ).length,
+      unmatchedPayments: sessionPayments.filter((payment) =>
+        isOpenAmount(paymentOpen.get(payment.id) ?? Math.abs(payment.amount)),
+      ).length,
     },
   };
 }
@@ -236,6 +262,67 @@ export async function deleteAllSessions() {
   return { deletedCount, payerKeysDeleted };
 }
 
+export type LinkInvoiceSource = {
+  kind: "invoice";
+  invoiceNumber: string;
+  invoiceDate: string;
+  client: string;
+  total: number;
+  openAmount: number;
+};
+
+export type LinkPaymentSource = {
+  kind: "payment";
+  paymentDate: string;
+  client: string;
+  amount: number;
+  description: string;
+  openAmount: number;
+};
+
+export async function getLinkSource(
+  sessionId: string,
+  sourceId: string,
+  kind: "invoice" | "payment",
+): Promise<LinkInvoiceSource | LinkPaymentSource | null> {
+  const db = getDb();
+  const activeMatches = await db.matches
+    .where("sessionId")
+    .equals(sessionId)
+    .filter((match) => match.active)
+    .toArray();
+
+  if (kind === "invoice") {
+    const invoice = await db.invoices.get(sourceId);
+    if (!invoice || invoice.sessionId !== sessionId) return null;
+    return {
+      kind: "invoice",
+      invoiceNumber: invoice.invoiceNumber,
+      invoiceDate: invoice.invoiceDate,
+      client: invoice.client,
+      total: invoice.total,
+      openAmount: openAmountFor(
+        invoice.total,
+        activeMatches.filter((match) => match.invoiceId === invoice.id),
+      ),
+    };
+  }
+
+  const payment = await db.payments.get(sourceId);
+  if (!payment || payment.sessionId !== sessionId) return null;
+  return {
+    kind: "payment",
+    paymentDate: payment.paymentDate,
+    client: payment.client,
+    amount: payment.amount,
+    description: payment.description,
+    openAmount: openAmountFor(
+      Math.abs(payment.amount),
+      activeMatches.filter((match) => match.paymentId === payment.id),
+    ),
+  };
+}
+
 export async function getUnmatchedForLinking(sessionId: string) {
   const db = getDb();
   const activeMatches = await db.matches
@@ -243,15 +330,34 @@ export async function getUnmatchedForLinking(sessionId: string) {
     .equals(sessionId)
     .filter((m) => m.active)
     .toArray();
-  const matchedInvoiceIds = new Set(activeMatches.map((m) => m.invoiceId));
-  const matchedPaymentIds = new Set(activeMatches.map((m) => m.paymentId));
-
   const sessionInvoices = await db.invoices.where("sessionId").equals(sessionId).toArray();
   const sessionPayments = await db.payments.where("sessionId").equals(sessionId).toArray();
+  const invoiceOpen = new Map(
+    sessionInvoices.map((invoice) => [
+      invoice.id,
+      openAmountFor(
+        invoice.total,
+        activeMatches.filter((match) => match.invoiceId === invoice.id),
+      ),
+    ]),
+  );
+  const paymentOpen = new Map(
+    sessionPayments.map((payment) => [
+      payment.id,
+      openAmountFor(
+        Math.abs(payment.amount),
+        activeMatches.filter((match) => match.paymentId === payment.id),
+      ),
+    ]),
+  );
 
   return {
-    unmatchedInvoices: sessionInvoices.filter((i) => !matchedInvoiceIds.has(i.id)),
-    unmatchedPayments: sessionPayments.filter((p) => !matchedPaymentIds.has(p.id)),
+    unmatchedInvoices: sessionInvoices.filter((invoice) =>
+      isOpenAmount(invoiceOpen.get(invoice.id) ?? invoice.total),
+    ),
+    unmatchedPayments: sessionPayments.filter((payment) =>
+      isOpenAmount(paymentOpen.get(payment.id) ?? Math.abs(payment.amount)),
+    ),
   };
 }
 
@@ -262,18 +368,34 @@ export async function getRecordsForOverride(sessionId: string, matchId: string) 
     .equals(sessionId)
     .filter((m) => m.active)
     .toArray();
-  const otherMatchedInvoiceIds = new Set(
-    activeMatches.filter((m) => m.id !== matchId).map((m) => m.invoiceId),
-  );
-  const otherMatchedPaymentIds = new Set(
-    activeMatches.filter((m) => m.id !== matchId).map((m) => m.paymentId),
-  );
-
+  const otherMatches = activeMatches.filter((match) => match.id !== matchId);
   const sessionInvoices = await db.invoices.where("sessionId").equals(sessionId).toArray();
   const sessionPayments = await db.payments.where("sessionId").equals(sessionId).toArray();
+  const invoiceOpen = new Map(
+    sessionInvoices.map((invoice) => [
+      invoice.id,
+      openAmountFor(
+        invoice.total,
+        otherMatches.filter((match) => match.invoiceId === invoice.id),
+      ),
+    ]),
+  );
+  const paymentOpen = new Map(
+    sessionPayments.map((payment) => [
+      payment.id,
+      openAmountFor(
+        Math.abs(payment.amount),
+        otherMatches.filter((match) => match.paymentId === payment.id),
+      ),
+    ]),
+  );
 
   return {
-    availableInvoices: sessionInvoices.filter((i) => !otherMatchedInvoiceIds.has(i.id)),
-    availablePayments: sessionPayments.filter((p) => !otherMatchedPaymentIds.has(p.id)),
+    availableInvoices: sessionInvoices.filter((invoice) =>
+      isOpenAmount(invoiceOpen.get(invoice.id) ?? invoice.total),
+    ),
+    availablePayments: sessionPayments.filter((payment) =>
+      isOpenAmount(paymentOpen.get(payment.id) ?? Math.abs(payment.amount)),
+    ),
   };
 }

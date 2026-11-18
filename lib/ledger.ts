@@ -17,6 +17,8 @@ export type LedgerLine = {
   debit: number;
   credit: number;
   balance: number;
+  openAmount: number;
+  daysOpen: number | null;
 };
 
 export type ClientLedger = {
@@ -39,7 +41,7 @@ export type LedgerTotals = {
   balance: number;
 };
 
-type DraftLine = Omit<LedgerLine, "balance">;
+type DraftLine = Omit<LedgerLine, "balance" | "daysOpen">;
 
 function ledgerLabel(payerKey: string, clients: string[]): string {
   if (clients.length === 1) return clients[0];
@@ -89,10 +91,25 @@ function compareLines(a: DraftLine, b: DraftLine): number {
   return a.document.localeCompare(b.document, "hr");
 }
 
+function isoDate(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function daysBetween(from: string, to: string): number | null {
+  if (!from) return null;
+  const start = Date.parse(`${from}T00:00:00`);
+  const end = Date.parse(`${to}T00:00:00`);
+  if (Number.isNaN(start) || Number.isNaN(end)) return null;
+  return Math.max(0, Math.round((end - start) / 86400000));
+}
+
 export function buildClientLedgers(
   records: RecordRow[],
   filters: FilterState,
   payerKeyMap: PayerKeyMap = new Map(),
+  asOf = isoDate(new Date()),
 ): ClientLedger[] {
   const groups = new Map<string, { payerKey: string; clients: Set<string>; lines: DraftLine[] }>();
   const seen = new Set<string>();
@@ -125,6 +142,7 @@ export function buildClientLedgers(
         document: record.invoice.invoiceNumber,
         debit: record.invoice.total,
         credit: 0,
+        openAmount: record.invoice.openAmount ?? (record.payment ? 0 : record.invoice.total),
       });
     }
     if (record.payment) {
@@ -136,6 +154,7 @@ export function buildClientLedgers(
         document: record.payment.description,
         debit: 0,
         credit: Math.abs(record.payment.amount),
+        openAmount: record.payment.openAmount ?? (record.invoice ? 0 : Math.abs(record.payment.amount)),
       });
     }
   }
@@ -147,7 +166,12 @@ export function buildClientLedgers(
       let running = 0;
       const lines = sorted.map((line) => {
         running += line.debit - line.credit;
-        return { ...line, balance: running };
+        return {
+          ...line,
+          balance: running,
+          daysOpen:
+            line.kind === "invoice" && line.openAmount > 0.01 ? daysBetween(line.date, asOf) : null,
+        };
       });
       const invoiced = lines.reduce((sum, line) => sum + line.debit, 0);
       const paid = lines.reduce((sum, line) => sum + line.credit, 0);

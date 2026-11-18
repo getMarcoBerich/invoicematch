@@ -20,21 +20,19 @@ export function normalizeForCompare(number: string): string {
   return number.trim().replace(/\s+/g, "").toUpperCase();
 }
 
+function sameInvoiceNumber(left: string, right: string): boolean {
+  if (left === right) return true;
+  const [shorter, longer] = left.length <= right.length ? [left, right] : [right, left];
+  if (!longer.endsWith(`/${shorter}`)) return false;
+  return shorter.split("/")[0] === longer.split("/")[0];
+}
+
 export function invoiceNumbersMatch(
   invoiceNumber: string,
   description: string,
 ): boolean {
   const normalizedInvoice = normalizeForCompare(invoiceNumber);
-  const extracted = extractInvoiceNumbersFromText(description);
-  if (extracted.some((n) => n === normalizedInvoice)) return true;
-
-  const invoiceParts = normalizedInvoice.split("/");
-  if (invoiceParts.length >= 2) {
-    const suffix = invoiceParts.slice(-2).join("/");
-    if (extracted.some((n) => n.endsWith(suffix) || n.includes(suffix))) {
-      return true;
-    }
-  }
-
-  return false;
+  return extractInvoiceNumbersFromText(description).some((number) =>
+    sameInvoiceNumber(normalizedInvoice, number),
+  );
 }

@@ -51,6 +51,8 @@ describe("Invoice number extraction", () => {
 
   it("matches invoice numbers in descriptions", () => {
     expect(invoiceNumbersMatch("2/DBA/1", "Račun br. 2/DBA/1")).toBe(true);
+    expect(invoiceNumbersMatch("128/RAC/25", "UR HORWATH br. 128/RAC/25")).toBe(true);
+    expect(invoiceNumbersMatch("116/RAC/25", "UR HORWATH br. 128/RAC/25")).toBe(false);
     expect(invoiceNumbersMatch("285/HQX/1", "Račun br. 12/HQX/26")).toBe(false);
   });
 });
