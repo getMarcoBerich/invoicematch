@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { downloadLedgerWorkbook, ledgerXlsxFilename } from "@/lib/export/ledger-xlsx";
 import { formatAmount, formatDate } from "@/lib/format";
 import { hr } from "@/lib/i18n/hr";
 import { ledgerTotals, type ClientLedger } from "@/lib/ledger";
@@ -39,7 +41,15 @@ function AmountWithCount({ amount, count }: { amount: number; count: string }) {
   );
 }
 
-export function LedgerPanel({ ledgers }: { ledgers: ClientLedger[] }) {
+export function LedgerPanel({
+  ledgers,
+  sessionName,
+  onExportError,
+}: {
+  ledgers: ClientLedger[];
+  sessionName: string;
+  onExportError?: (message: string) => void;
+}) {
   const [openKey, setOpenKey] = useState<string | null>(null);
   const openLedger = ledgers.find((ledger) => ledger.payerKey === openKey) ?? null;
 
@@ -143,6 +153,8 @@ export function LedgerPanel({ ledgers }: { ledgers: ClientLedger[] }) {
 
       <LedgerCardDialog
         ledger={openLedger}
+        sessionName={sessionName}
+        onExportError={onExportError}
         onOpenChange={(open) => {
           if (!open) setOpenKey(null);
         }}
@@ -153,9 +165,13 @@ export function LedgerPanel({ ledgers }: { ledgers: ClientLedger[] }) {
 
 function LedgerCardDialog({
   ledger,
+  sessionName,
+  onExportError,
   onOpenChange,
 }: {
   ledger: ClientLedger | null;
+  sessionName: string;
+  onExportError?: (message: string) => void;
   onOpenChange: (open: boolean) => void;
 }) {
   return (
@@ -277,6 +293,20 @@ function LedgerCardDialog({
             </div>
 
             <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  void downloadLedgerWorkbook(
+                    [ledger],
+                    ledgerXlsxFilename(sessionName, ledger.label),
+                  ).catch((err) => {
+                    onExportError?.(err instanceof Error ? err.message : hr.api.exportFailed);
+                  });
+                }}
+              >
+                <Download className="size-4" />
+                {hr.workspace.exportExcel}
+              </Button>
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 {hr.ledger.close}
               </Button>

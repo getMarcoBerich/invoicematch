@@ -25,7 +25,8 @@ import {
   sumPaymentAmounts,
   type TabView,
 } from "@/lib/filters";
-import { buildLedgerCsv, buildRecordsCsv, downloadCsvFile, recordsCsvFilename } from "@/lib/export/csv";
+import { buildRecordsCsv, downloadCsvFile, recordsCsvFilename } from "@/lib/export/csv";
+import { downloadLedgerWorkbook, ledgerXlsxFilename } from "@/lib/export/ledger-xlsx";
 import { formatAmount, formatDateTime } from "@/lib/format";
 import { hr } from "@/lib/i18n/hr";
 import { buildClientLedgers, ledgerTotals } from "@/lib/ledger";
@@ -174,7 +175,14 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
   };
 
   const handleExportView = () => {
-    const csv = onAccountCards ? buildLedgerCsv(ledgers) : buildRecordsCsv(filteredRecords);
+    if (onAccountCards) {
+      const sessionName = getSessionDisplayName(data.session);
+      void downloadLedgerWorkbook(ledgers, ledgerXlsxFilename(sessionName)).catch((err) => {
+        setError(err instanceof Error ? err.message : hr.api.exportFailed);
+      });
+      return;
+    }
+    const csv = buildRecordsCsv(filteredRecords);
     downloadCsvFile(csv, recordsCsvFilename(getSessionDisplayName(data.session), "view"));
   };
 
@@ -234,9 +242,14 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
             <Download className="size-4" />
             {hr.workspace.exportCsvAll}
           </Button>
-          <Button variant="outline" size="sm" onClick={handleExportView}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportView}
+            disabled={onAccountCards && ledgers.length === 0}
+          >
             <Download className="size-4" />
-            {hr.workspace.exportCsvView}
+            {onAccountCards ? hr.workspace.exportExcel : hr.workspace.exportCsvView}
           </Button>
         </div>
       </div>
@@ -331,7 +344,11 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
               ),
             )}
             <TabsContent value="konto-kartice">
-              <LedgerPanel ledgers={ledgers} />
+              <LedgerPanel
+                ledgers={ledgers}
+                sessionName={displayName}
+                onExportError={(message) => setError(message)}
+              />
             </TabsContent>
           </Tabs>
 

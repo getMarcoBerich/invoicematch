@@ -65,7 +65,7 @@ export const hr = {
         },
         {
           title: "Ključevi platioca i izvoz",
-          body: "Ako isti platitelj ima različita imena na računu i izvodu, spoji ih istim ključem platioca. Kad završiš, izvezi sve ili trenutni prikaz u CSV.",
+          body: "Ako isti platitelj ima različita imena na računu i izvodu, spoji ih istim ključem platioca. Kad završiš, izvezi sve ili trenutni prikaz u CSV. Konto kartice se izvoze u Excel.",
         },
       ],
       privacy:
@@ -90,6 +90,7 @@ export const hr = {
     matchingInProgress: "Uparivanje u tijeku…",
     exportCsvAll: "Izvezi sve",
     exportCsvView: "Izvezi prikaz",
+    exportExcel: "Izvezi Excel",
     clientKeys: "Ključevi platioca",
     stats: {
       invoices: "Računi",
@@ -299,6 +300,7 @@ export const hr = {
     paymentDescription: "Opis uplate",
     filenamePrefix: "uparivanje-racuna",
     filenameSuffixView: "-prikaz",
+    ledgerFilenamePrefix: "konto-kartice",
     statusLabels: {
       auto: "Automatski",
       manual: "Ručno",
