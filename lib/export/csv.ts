@@ -1,4 +1,5 @@
 import { hr } from "@/lib/i18n/hr";
+import type { ClientLedger } from "@/lib/ledger";
 import type { RecordRow } from "@/lib/types";
 
 function escapeCsv(value: string | number | null | undefined): string {
@@ -41,6 +42,36 @@ export function buildRecordsCsv(records: RecordRow[]): string {
       r.payment?.amount ?? "",
       r.payment?.client ?? "",
       r.payment?.description ?? "",
+    ]
+      .map(escapeCsv)
+      .join(","),
+  );
+
+  return [headers.join(","), ...rows].join("\n");
+}
+
+export function buildLedgerCsv(ledgers: ClientLedger[]): string {
+  const headers = [
+    hr.ledger.client,
+    hr.ledger.payerKey,
+    hr.ledger.aliases,
+    hr.ledger.invoiceCount,
+    hr.ledger.invoiced,
+    hr.ledger.paymentCount,
+    hr.ledger.paid,
+    hr.ledger.balance,
+  ];
+
+  const rows = ledgers.map((ledger) =>
+    [
+      ledger.label,
+      ledger.payerKey,
+      ledger.clients.join(" | "),
+      ledger.invoiceCount,
+      ledger.invoiced,
+      ledger.paymentCount,
+      ledger.paid,
+      ledger.balance,
     ]
       .map(escapeCsv)
       .join(","),

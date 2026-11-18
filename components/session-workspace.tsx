@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FilterPanel, defaultFilters, type FilterState } from "@/components/filter-panel";
+import { LedgerPanel } from "@/components/ledger-panel";
 import { MatchTable } from "@/components/match-table";
 import { LinkDialog } from "@/components/link-dialog";
 import { ClientKeysPanel } from "@/components/client-keys-panel";
@@ -24,9 +25,10 @@ import {
   sumPaymentAmounts,
   type TabView,
 } from "@/lib/filters";
-import { buildRecordsCsv, downloadCsvFile, recordsCsvFilename } from "@/lib/export/csv";
+import { buildLedgerCsv, buildRecordsCsv, downloadCsvFile, recordsCsvFilename } from "@/lib/export/csv";
 import { formatAmount, formatDateTime } from "@/lib/format";
 import { hr } from "@/lib/i18n/hr";
+import { buildClientLedgers, ledgerTotals } from "@/lib/ledger";
 import { runAutoMatch, unlinkMatch } from "@/lib/matching/engine";
 import { getSessionClientKeys } from "@/lib/services/client-keys";
 import { getSessionDisplayName, getSessionRecords } from "@/lib/services/session";
@@ -148,12 +150,23 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
 
   const clients = collectClients(data.records);
   const payerKeys = collectPayerKeys(data.records, payerKeyMap);
+  const ledgers = buildClientLedgers(data.records, filters, payerKeyMap);
+  const ledgerSummary = ledgerTotals(ledgers);
+  const onAccountCards = tab === "konto-kartice";
   const filteredRecords = filterRecords(data.records, filters, tab, payerKeyMap);
   const filteredCount = filteredRecords.length;
-  const visibleInvoiceTotal = sumInvoiceTotals(filteredRecords);
-  const visiblePaymentTotal = sumPaymentAmounts(filteredRecords);
-  const visibleInvoiceCount = countInvoices(filteredRecords);
-  const visiblePaymentCount = countPayments(filteredRecords);
+  const visibleInvoiceTotal = onAccountCards
+    ? ledgerSummary.invoiced
+    : sumInvoiceTotals(filteredRecords);
+  const visiblePaymentTotal = onAccountCards
+    ? ledgerSummary.paid
+    : sumPaymentAmounts(filteredRecords);
+  const visibleInvoiceCount = onAccountCards
+    ? ledgerSummary.invoiceCount
+    : countInvoices(filteredRecords);
+  const visiblePaymentCount = onAccountCards
+    ? ledgerSummary.paymentCount
+    : countPayments(filteredRecords);
 
   const handleExportAll = () => {
     const csv = buildRecordsCsv(data.records);
@@ -161,7 +174,7 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
   };
 
   const handleExportView = () => {
-    const csv = buildRecordsCsv(filteredRecords);
+    const csv = onAccountCards ? buildLedgerCsv(ledgers) : buildRecordsCsv(filteredRecords);
     downloadCsvFile(csv, recordsCsvFilename(getSessionDisplayName(data.session), "view"));
   };
 
@@ -290,7 +303,7 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
 
         <div className="min-w-0">
           <Tabs value={tab} onValueChange={(v) => setTab(v as TabView)}>
-            <TabsList>
+            <TabsList className="h-auto flex-wrap group-data-horizontal/tabs:h-auto">
               <TabsTrigger value="all">{hr.workspace.tabs.all}</TabsTrigger>
               <TabsTrigger value="matched">{hr.workspace.tabs.matched}</TabsTrigger>
               <TabsTrigger value="unmatched-invoices">
@@ -299,10 +312,11 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
               <TabsTrigger value="unmatched-payments">
                 {hr.workspace.tabs.unmatchedPayments}
               </TabsTrigger>
+              <TabsTrigger value="konto-kartice">{hr.workspace.tabs.accountCards}</TabsTrigger>
             </TabsList>
             <Separator className="my-1" />
 
-            {(["all", "matched", "unmatched-invoices", "unmatched-payments"] as TabView[]).map(
+            {(["all", "matched", "unmatched-invoices", "unmatched-payments"] as const).map(
               (t) => (
                 <TabsContent key={t} value={t}>
                   <MatchTable
@@ -316,10 +330,15 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
                 </TabsContent>
               ),
             )}
+            <TabsContent value="konto-kartice">
+              <LedgerPanel ledgers={ledgers} />
+            </TabsContent>
           </Tabs>
 
           <p className="mt-1 text-xs text-muted-foreground">
-            {hr.workspace.showingRecords(filteredCount, data.records.length)}
+            {onAccountCards
+              ? hr.workspace.showingClients(ledgers.length)
+              : hr.workspace.showingRecords(filteredCount, data.records.length)}
           </p>
         </div>
       </div>

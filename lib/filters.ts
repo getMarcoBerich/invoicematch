@@ -6,7 +6,12 @@ import {
   type PayerKeyMap,
 } from "@/lib/clients/payer-keys";
 
-export type TabView = "all" | "matched" | "unmatched-invoices" | "unmatched-payments";
+export type TabView =
+  | "all"
+  | "matched"
+  | "unmatched-invoices"
+  | "unmatched-payments"
+  | "konto-kartice";
 
 export function buildPayerKeyMapFromApi(data: {
   clients?: { normalized: string; payerKey: string; isCustomKey: boolean }[];
