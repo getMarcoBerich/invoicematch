@@ -29,6 +29,8 @@ const alfa = ledger("Klijent Alfa", [
     debit: 1000,
     credit: 0,
     balance: 1000,
+    openAmount: 0,
+    daysOpen: null,
   },
   {
     id: "pay-1",
@@ -39,6 +41,8 @@ const alfa = ledger("Klijent Alfa", [
     debit: 0,
     credit: 400,
     balance: 600,
+    openAmount: 0,
+    daysOpen: null,
   },
 ]);
 
@@ -54,6 +58,8 @@ describe("buildLedgerXlsx", () => {
         debit: 500,
         credit: 0,
         balance: 500,
+        openAmount: 0,
+        daysOpen: null,
       },
     ]);
 

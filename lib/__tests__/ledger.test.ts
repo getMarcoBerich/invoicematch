@@ -127,8 +127,8 @@ describe("buildClientLedgers", () => {
 
     expect(ledgers).toHaveLength(2);
     const ledger = ledgers.find((item) => item.label === "HORWATH");
-    expect(ledger).toBeDefined();
-    expect(ledger!.label).toBe("HORWATH");
+    if (!ledger) throw new Error("expected HORWATH ledger");
+    expect(ledger.label).toBe("HORWATH");
     expect(ledger.clients).toEqual(["Horwath Hrvatska", "HW Zagreb"]);
     expect(ledger.invoiced).toBe(800);
     expect(ledger.paid).toBe(300);

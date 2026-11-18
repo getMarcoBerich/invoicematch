@@ -63,30 +63,53 @@ function combinationSums(
   invoices: ScoringInvoice[],
   target: number,
 ): ScoringInvoice[] | null {
+  const pool = invoices.slice(0, Math.min(invoices.length, 8));
   let best: { items: ScoringInvoice[]; gap: number } | null = null;
-  const limit = Math.min(invoices.length, 8);
 
-  const visit = (start: number, chosen: ScoringInvoice[], sum: number) => {
-    if (chosen.length >= 2 && sumClose(sum, target)) {
-      const gap = Math.abs(sum - target);
-      if (
-        !best ||
-        gap < best.gap - 0.001 ||
-        (Math.abs(gap - best.gap) <= 0.001 && chosen.length < best.items.length)
-      ) {
-        best = { items: [...chosen], gap };
+  for (let i = 0; i < pool.length; i++) {
+    const first = pool[i];
+    for (let j = i + 1; j < pool.length; j++) {
+      const second = pool[j];
+      const sum2 = roundMoney(first.total + second.total);
+      best = preferCombination(best, [first, second], sum2, target);
+      if (sum2 > target + Math.max(0.05, target * 0.005)) continue;
+      for (let k = j + 1; k < pool.length; k++) {
+        const third = pool[k];
+        const sum3 = roundMoney(sum2 + third.total);
+        best = preferCombination(best, [first, second, third], sum3, target);
+        if (sum3 > target + Math.max(0.05, target * 0.005)) continue;
+        for (let n = k + 1; n < pool.length; n++) {
+          const fourth = pool[n];
+          best = preferCombination(
+            best,
+            [first, second, third, fourth],
+            roundMoney(sum3 + fourth.total),
+            target,
+          );
+        }
       }
     }
-    if (chosen.length === 4 || start >= limit || sum > target + Math.max(0.05, target * 0.005)) return;
-    for (let index = start; index < limit; index++) {
-      chosen.push(invoices[index]);
-      visit(index + 1, chosen, roundMoney(sum + invoices[index].total));
-      chosen.pop();
-    }
-  };
+  }
 
-  visit(0, [], 0);
   return best?.items ?? null;
+}
+
+function preferCombination(
+  current: { items: ScoringInvoice[]; gap: number } | null,
+  items: ScoringInvoice[],
+  sum: number,
+  target: number,
+): { items: ScoringInvoice[]; gap: number } | null {
+  if (items.length < 2 || !sumClose(sum, target)) return current;
+  const gap = Math.abs(sum - target);
+  if (
+    current === null ||
+    gap < current.gap - 0.001 ||
+    (Math.abs(gap - current.gap) <= 0.001 && items.length < current.items.length)
+  ) {
+    return { items: [...items], gap };
+  }
+  return current;
 }
 
 function reasonsFor(
