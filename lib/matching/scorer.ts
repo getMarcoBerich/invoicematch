@@ -31,8 +31,8 @@ export type ScoringPayment = {
 };
 
 const WEIGHTS = {
-  amount: 40,
-  invoiceNumber: 35,
+  amount: 55,
+  invoiceNumber: 20,
   client: 20,
   date: 5,
 } as const;

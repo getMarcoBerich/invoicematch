@@ -127,6 +127,71 @@ describe("Scorer", () => {
     );
 
     expect(result).not.toBeNull();
-    expect(result!.confidence).toBeGreaterThanOrEqual(60);
+    expect(result!.confidence).toBeGreaterThanOrEqual(75);
+  });
+
+  it("matches the same amount and client when the description cites another invoice", () => {
+    const miroslav = scorePair(
+      {
+        id: "inv-miroslav",
+        invoiceNumber: "2394/HQX/1",
+        invoiceDate: "2026-10-01",
+        clientNormalized: "MIROSLAV HANŽEVAČKI",
+        payerKey: "MIROSLAV HANŽEVAČKI",
+        total: 400,
+      },
+      {
+        id: "pay-miroslav",
+        paymentDate: "2026-10-05",
+        clientNormalized: "MIROSLAV HANŽEVAČKI",
+        payerKey: "MIROSLAV HANŽEVAČKI",
+        amount: 400,
+        description: "Racun za 7/21",
+      },
+    );
+    const transbay = scorePair(
+      {
+        id: "inv-transbay",
+        invoiceNumber: "2409/HQX/1",
+        invoiceDate: "2026-10-03",
+        clientNormalized: "TRANSBAY D.O.O.",
+        payerKey: "TRANSBAY D.O.O.",
+        total: 1150,
+      },
+      {
+        id: "pay-transbay",
+        paymentDate: "2026-10-08",
+        clientNormalized: "TRANSBAY D.O.O.",
+        payerKey: "TRANSBAY D.O.O.",
+        amount: 1150,
+        description: "Uplata po racunu 512/01/261",
+      },
+    );
+
+    expect(miroslav!.confidence).toBeGreaterThanOrEqual(75);
+    expect(transbay!.confidence).toBeGreaterThanOrEqual(75);
+  });
+
+  it("does not match the same amount for a different client without the invoice number", () => {
+    const result = scorePair(
+      {
+        id: "inv-transbay",
+        invoiceNumber: "2409/HQX/1",
+        invoiceDate: "2026-10-03",
+        clientNormalized: "TRANSBAY D.O.O.",
+        payerKey: "TRANSBAY D.O.O.",
+        total: 1150,
+      },
+      {
+        id: "pay-other",
+        paymentDate: "2026-10-08",
+        clientNormalized: "DRUGI KLIJENT D.O.O.",
+        payerKey: "DRUGI KLIJENT D.O.O.",
+        amount: 1150,
+        description: "Uplata po racunu 512/01/261",
+      },
+    );
+
+    expect(result!.confidence).toBeLessThan(75);
   });
 });

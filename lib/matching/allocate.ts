@@ -131,13 +131,13 @@ function reasonsFor(
   return [
     {
       signal: "amount",
-      weight: 40,
+      weight: 55,
       score: kind === "split" ? 1 : 0.7,
       detail: amountDetail,
     },
     {
       signal: "invoiceNumber",
-      weight: 35,
+      weight: 20,
       score: numberHit ? 1 : 0,
       detail: numberHit ? hr.match.invoiceNumFound : hr.match.invoiceNumNotFound(payment.description),
     },
