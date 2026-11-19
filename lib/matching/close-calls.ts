@@ -3,7 +3,7 @@ import type { RecordRow } from "@/lib/types";
 import { normalizeClient, resolvePayerKey, type PayerKeyMap } from "@/lib/clients/payer-keys";
 import { isRefundPayment, OPEN_TOLERANCE } from "@/lib/matching/allocate";
 
-const CLOSE_CALL_MIN = 50;
+const CLOSE_CALL_MIN = 60;
 const CLOSE_CALL_LIMIT = 40;
 const DATE_MATCH_DAYS = 7;
 
@@ -60,7 +60,7 @@ function pointsFor(reasons: { signal: string; score: number; weight: number }[],
   return Math.round(reason.score * reason.weight * 100) / 100;
 }
 
-/** Open pairs from 50 up to the automatic-match threshold. */
+/** Open pairs from 60 up to the automatic-match threshold. */
 export function findCloseCalls(
   invoices: CloseCallInvoice[],
   payments: CloseCallPayment[],

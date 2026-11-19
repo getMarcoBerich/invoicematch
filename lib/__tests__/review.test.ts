@@ -90,7 +90,7 @@ describe("buildAutoMatchPlan", () => {
 });
 
 describe("findCloseCalls", () => {
-  it("keeps a near amount for the same client and an exact amount for a different client", () => {
+  it("keeps a near amount for the same client", () => {
     const calls = findCloseCalls(
       [
         {
@@ -134,14 +134,10 @@ describe("findCloseCalls", () => {
       ],
     );
 
-    expect(calls.map((call) => call.invoiceId)).toEqual(["near", "other"]);
+    expect(calls.map((call) => call.invoiceId)).toEqual(["near"]);
+    expect(calls[0].confidence).toBeGreaterThanOrEqual(60);
     expect(calls[0].confidence).toBeLessThan(75);
     expect(calls[0].matches).toEqual(expect.arrayContaining(["nearAmount", "client", "date"]));
-    expect(calls[1].confidence).toBeGreaterThanOrEqual(50);
-    expect(calls[1].confidence).toBeLessThan(75);
-    expect(calls[1].matches).toEqual(expect.arrayContaining(["amount", "date"]));
-    expect(calls[1].matches).not.toContain("client");
-    expect(calls[1].matches).not.toContain("invoiceNumber");
   });
 });
 

@@ -324,7 +324,7 @@ export const hr = {
     close: "Zatvori",
     openItemsEmpty: "Nema otvorenih računa.",
     closeCallsHint:
-      "Otvoreni parovi od 50 do ispod praga 75.",
+      "Otvoreni parovi od 60 do ispod praga 75.",
     closeCallsEmpty: "Nema potencijalnih parova.",
     closeCallInvoice: "Račun",
     closeCallPayment: "Uplata",
