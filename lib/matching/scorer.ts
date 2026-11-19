@@ -3,6 +3,7 @@ import { differenceInDays, parseISO } from "date-fns";
 import type { MatchReason } from "@/lib/types";
 import { hr } from "@/lib/i18n/hr";
 import { isNearAmount, nearAmountLimit, OPEN_TOLERANCE } from "./allocate";
+import { foldClientName } from "@/lib/clients/payer-keys";
 import { invoiceNumbersMatch } from "./invoice-number";
 
 export type MatchCandidate = {
@@ -82,22 +83,21 @@ export function scorePair(
 
   let clientScore = 0;
   let clientDetail = "";
+  const invoiceName = foldClientName(invoice.clientNormalized);
+  const paymentName = foldClientName(payment.clientNormalized);
 
-  if (invoice.payerKey === payment.payerKey) {
-    clientScore = 1;
-    clientDetail =
-      invoice.clientNormalized === payment.clientNormalized
-        ? hr.match.clientMatch
-        : hr.match.payerKeyMatch(invoice.payerKey);
-  } else if (invoice.clientNormalized === payment.clientNormalized) {
+  if (invoiceName === paymentName) {
     clientScore = 1;
     clientDetail = hr.match.clientMatch;
+  } else if (invoice.payerKey === payment.payerKey) {
+    clientScore = 1;
+    clientDetail = hr.match.payerKeyMatch(invoice.payerKey);
   } else {
-    const fuse = new Fuse([payment.clientNormalized], {
+    const fuse = new Fuse([paymentName], {
       threshold: CLIENT_FUSE_THRESHOLD,
       includeScore: true,
     });
-    const result = fuse.search(invoice.clientNormalized);
+    const result = fuse.search(invoiceName);
     if (result.length > 0 && result[0].score !== undefined && result[0].score <= CLIENT_FUSE_THRESHOLD) {
       clientScore = 1 - result[0].score;
     }

@@ -1,11 +1,16 @@
-import { normalizeClient } from "@/lib/clients/payer-keys";
+import { foldClientName } from "@/lib/clients/payer-keys";
 
 const STOPWORDS = new Set([
   "ZAGREB",
+  "ZAGREBU",
   "SPLIT",
+  "SPLITU",
   "RIJEKA",
+  "RIJECI",
   "OSIJEK",
+  "OSIJEKU",
   "DUBROVNIK",
+  "DUBROVNIKU",
   "CROATIA",
   "HRVATSKA",
   "CONSULTING",
@@ -15,6 +20,19 @@ const STOPWORDS = new Set([
   "GROUP",
   "GRUPA",
   "INTERNATIONAL",
+  "USLUGE",
+  "USLUGA",
+  "TRGOVINA",
+  "TRGOVINU",
+  "TRGOVINE",
+  "AGENCIJA",
+  "AGENCIJE",
+  "TURISTICKA",
+  "TURISTICKI",
+  "TURISTICKO",
+  "TEHNOLOGIJE",
+  "TEHNOLOGIJA",
+  "TRAVEL",
 ]);
 
 export type PayerKeyClient = {
@@ -29,7 +47,7 @@ export type PayerKeySuggestion = {
 };
 
 function tokens(name: string): string[] {
-  return normalizeClient(name)
+  return foldClientName(name)
     .split(/[^A-Z0-9]+/)
     .filter((token) => token.length >= 4 && !STOPWORDS.has(token));
 }
@@ -39,10 +57,10 @@ function similar(a: string, b: string): boolean {
   const right = new Set(tokens(b));
   const shared = left.filter((token) => right.has(token));
   if (shared.some((token) => token.length >= 5)) return true;
-  const compact = (value: string) => normalizeClient(value).replace(/[^A-Z0-9]/g, "");
-  const prefixA = compact(a).slice(0, 8);
-  const prefixB = compact(b).slice(0, 8);
-  return prefixA.length >= 6 && prefixA === prefixB;
+  const compact = (value: string) => foldClientName(value).replace(/[^A-Z0-9]/g, "");
+  const compactA = compact(a);
+  const compactB = compact(b);
+  return compactA.length >= 6 && compactA === compactB;
 }
 
 function suggestedKey(names: string[], customKeys: string[]): string {

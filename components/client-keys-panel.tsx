@@ -77,11 +77,7 @@ export function ClientKeysPanel({ sessionId, onKeysChanged }: ClientKeysPanelPro
       setExtraAliases(data.extraAliases ?? []);
       setSuggestions(data.suggestions ?? []);
       setAllPayerKeys(data.allPayerKeys);
-      const drafts: Record<string, string> = {};
-      for (const c of data.clients as ClientEntry[]) {
-        drafts[c.name] = c.payerKey;
-      }
-      setDraftKeys(drafts);
+      setDraftKeys({});
     } catch (err) {
       setClients([]);
       setExtraAliases([]);
@@ -304,12 +300,17 @@ export function ClientKeysPanel({ sessionId, onKeysChanged }: ClientKeysPanelPro
                 <p className="truncate text-xs font-medium" title={client.name}>
                   {client.name}
                 </p>
+                {client.isCustomKey && (
+                  <p className="truncate font-mono text-[11px] text-muted-foreground" title={client.payerKey}>
+                    {client.payerKey}
+                  </p>
+                )}
                 <div className="flex gap-1">
                   <Input
                     list={`payer-keys-${sessionId}`}
                     className="h-7 text-xs"
                     placeholder={hr.clientKeys.keyPlaceholder}
-                    value={draftKeys[client.name] ?? client.payerKey}
+                    value={draftKeys[client.name] ?? ""}
                     onChange={(e) =>
                       setDraftKeys((d) => ({ ...d, [client.name]: e.target.value }))
                     }
@@ -317,7 +318,7 @@ export function ClientKeysPanel({ sessionId, onKeysChanged }: ClientKeysPanelPro
                   <Button
                     size="sm"
                     className="h-7 shrink-0 px-2 text-xs"
-                    disabled={saving === client.name}
+                    disabled={saving === client.name || !(draftKeys[client.name] ?? "").trim()}
                     onClick={() => saveKey(client.name)}
                   >
                     {saving === client.name ? (

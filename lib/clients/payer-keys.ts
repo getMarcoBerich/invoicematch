@@ -21,6 +21,19 @@ export function normalizeClient(client: string): string {
   return normalizeClientName(client);
 }
 
+/** Comparison form: drops diacritics and punctuation so spelling variants match. */
+export function foldClientName(name: string): string {
+  return name
+    .toUpperCase()
+    .replace(/Đ/g, "D")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\./g, "")
+    .replace(/[^A-Z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
 export type PayerKeyGroup = {
   payerKey: string;
   clients: string[];

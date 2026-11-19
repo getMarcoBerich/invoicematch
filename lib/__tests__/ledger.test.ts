@@ -135,13 +135,25 @@ describe("buildClientLedgers", () => {
     expect(ledger.balance).toBe(500);
   });
 
-  it("uses the absolute payment amount", () => {
-    const [ledger] = buildClientLedgers(
-      [unmatchedInvoice("inv-1", "Klijent A", 200), unmatchedPayment("pay-1", "Klijent A", -80)],
+  it("treats a negative payment as a refund", () => {
+    const [withInvoice] = buildClientLedgers(
+      [
+        unmatchedInvoice("inv-1", "Sara Oda", 200),
+        unmatchedPayment("pay-1", "Sara Oda", -400, "2026-10-21"),
+      ],
       defaultFilters,
     );
-    expect(ledger.paid).toBe(80);
-    expect(ledger.balance).toBe(120);
+    const [refundOnly] = buildClientLedgers(
+      [unmatchedPayment("pay-1", "Sara Oda", -400, "2026-10-21")],
+      defaultFilters,
+    );
+
+    expect(withInvoice.paid).toBe(-400);
+    expect(withInvoice.balance).toBe(600);
+    expect(refundOnly.invoiced).toBe(0);
+    expect(refundOnly.paid).toBe(-400);
+    expect(refundOnly.balance).toBe(400);
+    expect(refundOnly.lines[0]).toMatchObject({ debit: 0, credit: -400, balance: 400 });
   });
 
   it("filters each document by its own date and ignores match status", () => {

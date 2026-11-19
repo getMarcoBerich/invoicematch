@@ -153,8 +153,9 @@ export function buildClientLedgers(
         client: record.payment.client,
         document: record.payment.description,
         debit: 0,
-        credit: Math.abs(record.payment.amount),
-        openAmount: record.payment.openAmount ?? (record.invoice ? 0 : Math.abs(record.payment.amount)),
+        credit: record.payment.amount,
+        openAmount:
+          record.payment.openAmount ?? (record.invoice ? 0 : Math.abs(record.payment.amount)),
       });
     }
   }

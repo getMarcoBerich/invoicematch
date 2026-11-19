@@ -194,4 +194,73 @@ describe("Scorer", () => {
 
     expect(result!.confidence).toBeLessThan(75);
   });
+
+  it("treats missing diacritics as the same client", () => {
+    const result = scorePair(
+      {
+        id: "inv-museum",
+        invoiceNumber: "2423/HQX/1",
+        invoiceDate: "2026-10-05",
+        clientNormalized: "ARHEOLOSKI MUZEJ U ZAGREBU",
+        payerKey: "ARHEOLOSKI MUZEJ U ZAGREBU",
+        total: 180,
+      },
+      {
+        id: "pay-museum",
+        paymentDate: "2026-10-06",
+        clientNormalized: "ARHEOLOŠKI MUZEJ U ZAGREBU",
+        payerKey: "ARHEOLOŠKI MUZEJ U ZAGREBU",
+        amount: 180,
+        description: "Najam vozila  UF-938-2026 Dosp:20.10.2026",
+      },
+    );
+
+    expect(result!.confidence).toBeGreaterThanOrEqual(75);
+  });
+
+  it("treats dotted initials as the same client", () => {
+    const result = scorePair(
+      {
+        id: "inv-pgp",
+        invoiceNumber: "2393/HQX/1",
+        invoiceDate: "2026-10-01",
+        clientNormalized: "PGP D.O.O.",
+        payerKey: "PGP D.O.O.",
+        total: 500,
+      },
+      {
+        id: "pay-pgp",
+        paymentDate: "2026-10-07",
+        clientNormalized: "P.G.P. D.O.O.",
+        payerKey: "P.G.P. D.O.O.",
+        amount: 500,
+        description: "Račun br. 450/01/261",
+      },
+    );
+
+    expect(result!.confidence).toBeGreaterThanOrEqual(75);
+  });
+
+  it("does not match a different person named in the payment description", () => {
+    const result = scorePair(
+      {
+        id: "inv-valentina",
+        invoiceNumber: "2422/HQX/1",
+        invoiceDate: "2026-10-05",
+        clientNormalized: "VALENTINA BAGARIĆ",
+        payerKey: "VALENTINA BAGARIĆ",
+        total: 14000,
+      },
+      {
+        id: "pay-josip",
+        paymentDate: "2026-10-06",
+        clientNormalized: "JOSIP BAGARIĆ",
+        payerKey: "JOSIP BAGARIĆ",
+        amount: 14000,
+        description: "VW Taigo - kupac Valentina Bagarić",
+      },
+    );
+
+    expect(result!.confidence).toBeLessThan(75);
+  });
 });
