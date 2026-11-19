@@ -37,6 +37,10 @@ export function openAmountFor(documentTotal: number, matches: SideMatch[]): numb
   return roundMoney(Math.max(0, Math.abs(documentTotal) - used));
 }
 
+export function isRefundPayment(amount: number): boolean {
+  return amount < -OPEN_TOLERANCE;
+}
+
 export function isOpenAmount(amount: number): boolean {
   return amount > OPEN_TOLERANCE;
 }

@@ -11,7 +11,8 @@ export type TabView =
   | "matched"
   | "unmatched-invoices"
   | "unmatched-payments"
-  | "konto-kartice";
+  | "konto-kartice"
+  | "otvorene-stavke";
 
 export function buildPayerKeyMapFromApi(data: {
   clients?: { normalized: string; payerKey: string; isCustomKey: boolean }[];

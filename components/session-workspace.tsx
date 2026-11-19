@@ -17,6 +17,8 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FilterPanel, defaultFilters, type FilterState } from "@/components/filter-panel";
 import { LedgerPanel } from "@/components/ledger-panel";
+import { CloseCallsPanel } from "@/components/close-calls-panel";
+import { OpenItemsPanel } from "@/components/open-items-panel";
 import { MatchTable } from "@/components/match-table";
 import { LinkDialog } from "@/components/link-dialog";
 import { ClientKeysPanel } from "@/components/client-keys-panel";
@@ -34,7 +36,7 @@ import {
   type TabView,
 } from "@/lib/filters";
 import { buildRecordsCsv, downloadCsvFile, recordsCsvFilename } from "@/lib/export/csv";
-import { downloadLedgerWorkbook, ledgerXlsxFilename } from "@/lib/export/ledger-xlsx";
+import { downloadLedgerWorkbook, downloadOpenItemsWorkbook, ledgerXlsxFilename, openItemsXlsxFilename } from "@/lib/export/ledger-xlsx";
 import {
   buildSessionBundle,
   downloadJsonFile,
@@ -42,8 +44,9 @@ import {
 } from "@/lib/services/session-bundle";
 import { formatAmount, formatDateTime } from "@/lib/format";
 import { hr } from "@/lib/i18n/hr";
-import { buildClientLedgers, ledgerTotals } from "@/lib/ledger";
-import { runAutoMatch, unlinkAllMatches, unlinkMatch } from "@/lib/matching/engine";
+import { buildClientLedgers, buildOpenItems, ledgerTotals } from "@/lib/ledger";
+import { closeCallsFromRecords } from "@/lib/matching/close-calls";
+import { runAutoMatch, unlinkAllMatches, unlinkMatch, createManualMatch } from "@/lib/matching/engine";
 import { getSessionClientKeys } from "@/lib/services/client-keys";
 import { getSessionDisplayName, getSessionRecords } from "@/lib/services/session";
 import type { RecordRow } from "@/lib/types";
@@ -87,11 +90,12 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
   const [unlinkAllOpen, setUnlinkAllOpen] = useState(false);
   const [unlinkIds, setUnlinkIds] = useState<string[]>([]);
   const [matchActivated, setMatchActivated] = useState(false);
+  const [matchWarningOpen, setMatchWarningOpen] = useState(false);
   const [payerKeyMap, setPayerKeyMap] = useState<PayerKeyMap>(new Map());
   const [renameOpen, setRenameOpen] = useState(false);
+  const [suggestionsHost, setSuggestionsHost] = useState<HTMLDivElement | null>(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
     setError(null);
     try {
       const [recordsData, keysData] = await Promise.all([
@@ -120,6 +124,7 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
   }, [data]);
 
   const handleRunMatch = async () => {
+    setMatchWarningOpen(false);
     setMatchActivated(true);
     setMatching(true);
     const started = Date.now();
@@ -132,6 +137,15 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
       setError(err instanceof Error ? err.message : hr.workspace.matchingFailed);
     } finally {
       setMatching(false);
+    }
+  };
+
+  const handleConnectCloseCall = async (invoiceId: string, paymentId: string) => {
+    try {
+      await createManualMatch(sessionId, invoiceId, paymentId);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : hr.api.linkFailed);
     }
   };
 
@@ -181,19 +195,28 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
   const clients = collectClients(data.records);
   const payerKeys = collectPayerKeys(data.records, payerKeyMap);
   const ledgers = buildClientLedgers(data.records, filters, payerKeyMap);
+  const openItems = buildOpenItems(ledgers);
+  const closeCalls = closeCallsFromRecords(data.records, payerKeyMap);
   const ledgerSummary = ledgerTotals(ledgers);
   const onAccountCards = tab === "konto-kartice";
+  const onOpenItems = tab === "otvorene-stavke";
   const filteredRecords = filterRecords(data.records, filters, tab, payerKeyMap);
   const filteredCount = filteredRecords.length;
-  const visibleInvoiceTotal = onAccountCards
-    ? ledgerSummary.invoiced
-    : sumInvoiceTotals(filteredRecords);
-  const visiblePaymentTotal = onAccountCards
-    ? ledgerSummary.paid
-    : sumPaymentAmounts(filteredRecords);
-  const visibleInvoiceCount = onAccountCards
-    ? ledgerSummary.invoiceCount
-    : countInvoices(filteredRecords);
+  const visibleInvoiceTotal = onOpenItems
+    ? openItems.reduce((sum, item) => sum + item.openAmount, 0)
+    : onAccountCards
+      ? ledgerSummary.invoiced
+      : sumInvoiceTotals(filteredRecords);
+  const visiblePaymentTotal = onOpenItems
+    ? 0
+    : onAccountCards
+      ? ledgerSummary.paid
+      : sumPaymentAmounts(filteredRecords);
+  const visibleInvoiceCount = onOpenItems
+    ? openItems.length
+    : onAccountCards
+      ? ledgerSummary.invoiceCount
+      : countInvoices(filteredRecords);
   const visiblePaymentCount = onAccountCards
     ? ledgerSummary.paymentCount
     : countPayments(filteredRecords);
@@ -202,7 +225,9 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
         data.records,
         new Set(ledgers.flatMap((ledger) => ledger.lines.map((line) => line.id))),
       )
-    : matchIdsInRecords(filteredRecords);
+    : onOpenItems
+      ? matchIdsForDocuments(data.records, new Set(openItems.map((item) => item.id)))
+      : matchIdsInRecords(filteredRecords);
 
   const handleExportAll = () => {
     const csv = buildRecordsCsv(data.records);
@@ -210,8 +235,14 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
   };
 
   const handleExportView = () => {
+    const sessionName = getSessionDisplayName(data.session);
+    if (onOpenItems) {
+      void downloadOpenItemsWorkbook(openItems, openItemsXlsxFilename(sessionName)).catch((err) => {
+        setError(err instanceof Error ? err.message : hr.api.exportFailed);
+      });
+      return;
+    }
     if (onAccountCards) {
-      const sessionName = getSessionDisplayName(data.session);
       void downloadLedgerWorkbook(ledgers, ledgerXlsxFilename(sessionName)).catch((err) => {
         setError(err instanceof Error ? err.message : hr.api.exportFailed);
       });
@@ -272,7 +303,7 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
                 ? "px-3 py-2 text-sm shadow-sm"
                 : "gap-2.5 px-8 py-4 text-base font-bold shadow-md sm:px-10 sm:py-5 sm:text-lg",
             )}
-            onClick={handleRunMatch}
+            onClick={() => setMatchWarningOpen(true)}
             disabled={matching || unlinkingAll}
           >
             {matching ? (
@@ -311,25 +342,31 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
             variant="outline"
             size="sm"
             onClick={handleExportView}
-            disabled={onAccountCards && ledgers.length === 0}
+            disabled={(onAccountCards && ledgers.length === 0) || (onOpenItems && openItems.length === 0)}
           >
             <Download className="size-4" />
-            {onAccountCards ? hr.workspace.exportExcel : hr.workspace.exportCsvView}
+            {onAccountCards || onOpenItems ? hr.workspace.exportExcel : hr.workspace.exportCsvView}
           </Button>
         </div>
       </div>
 
+      <div ref={setSuggestionsHost} className="empty:hidden" />
+
       <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
         {[
           {
-            label: hr.workspace.stats.totalInvoiced,
+            label: onOpenItems ? hr.ledger.openAmount : hr.workspace.stats.totalInvoiced,
             value: formatAmount(visibleInvoiceTotal),
             sub: hr.workspace.stats.invoicesCount(visibleInvoiceCount),
           },
           {
-            label: hr.workspace.stats.totalPaid,
-            value: formatAmount(visiblePaymentTotal),
-            sub: hr.workspace.stats.paymentsCount(visiblePaymentCount),
+            label: onOpenItems ? hr.ledger.daysOpen : hr.workspace.stats.totalPaid,
+            value: onOpenItems
+              ? String(openItems[0]?.daysOpen ?? 0)
+              : formatAmount(visiblePaymentTotal),
+            sub: onOpenItems
+              ? (openItems[0]?.client ?? "—")
+              : hr.workspace.stats.paymentsCount(visiblePaymentCount),
           },
         ].map((s) => (
           <Card key={s.label} size="sm" className="border-primary/20 bg-primary/5 py-0">
@@ -375,11 +412,16 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
             />
           </div>
           <div className="flex min-h-[calc(100vh-10rem)] min-w-0 flex-col overflow-hidden rounded-md border p-2">
-            <ClientKeysPanel sessionId={sessionId} onKeysChanged={load} />
+            <ClientKeysPanel
+              sessionId={sessionId}
+              onKeysChanged={load}
+              suggestionsHost={suggestionsHost}
+            />
           </div>
         </aside>
 
-        <div className="min-w-0">
+        <div className="min-w-0 space-y-2">
+          <CloseCallsPanel calls={closeCalls} onConnect={handleConnectCloseCall} />
           <Tabs value={tab} onValueChange={(v) => setTab(v as TabView)}>
             <TabsList className="h-auto flex-wrap group-data-horizontal/tabs:h-auto">
               <TabsTrigger value="all">{hr.workspace.tabs.all}</TabsTrigger>
@@ -391,6 +433,7 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
                 {hr.workspace.tabs.unmatchedPayments}
               </TabsTrigger>
               <TabsTrigger value="konto-kartice">{hr.workspace.tabs.accountCards}</TabsTrigger>
+              <TabsTrigger value="otvorene-stavke">{hr.workspace.tabs.openItems}</TabsTrigger>
             </TabsList>
             <Separator className="my-1" />
 
@@ -408,6 +451,12 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
                 </TabsContent>
               ),
             )}
+            <TabsContent value="otvorene-stavke">
+              <OpenItemsPanel
+                items={openItems}
+                onLinkInvoice={(id) => setDialog({ mode: "link-invoice", sourceId: id })}
+              />
+            </TabsContent>
             <TabsContent value="konto-kartice">
               <LedgerPanel
                 ledgers={ledgers}
@@ -460,6 +509,23 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
           );
         }}
       />
+
+      <Dialog open={matchWarningOpen} onOpenChange={setMatchWarningOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{hr.workspace.matchWarningTitle}</DialogTitle>
+            <DialogDescription>{hr.workspace.matchWarningDescription}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMatchWarningOpen(false)}>
+              {hr.dialog.cancel}
+            </Button>
+            <Button onClick={() => void handleRunMatch()} disabled={matching}>
+              {hr.workspace.matchWarningConfirm}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={unlinkAllOpen} onOpenChange={(open) => !unlinkingAll && setUnlinkAllOpen(open)}>
         <DialogContent>

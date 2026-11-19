@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { KeyRound, Loader2, Plus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { KeyRound, Loader2, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { hr } from "@/lib/i18n/hr";
@@ -38,8 +39,43 @@ type Suggestion = {
 
 type ClientKeysPanelProps = {
   sessionId: string;
-  onKeysChanged?: () => void;
+  onKeysChanged?: () => void | Promise<void>;
+  suggestionsHost?: HTMLElement | null;
 };
+
+const DISMISSED_SUGGESTIONS_KEY = "invoicematch-dismissed-suggestions";
+
+function parseDismissedSuggestions(raw: string | null): string[] {
+  if (!raw) return [];
+  const parsed = JSON.parse(raw) as unknown;
+  return Array.isArray(parsed) ? parsed.filter((item) => typeof item === "string") : [];
+}
+
+function readDismissedSuggestions(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored = parseDismissedSuggestions(localStorage.getItem(DISMISSED_SUGGESTIONS_KEY));
+    const earlier = parseDismissedSuggestions(sessionStorage.getItem(DISMISSED_SUGGESTIONS_KEY));
+    const merged = [...new Set([...stored, ...earlier])];
+    if (earlier.length > 0) {
+      localStorage.setItem(DISMISSED_SUGGESTIONS_KEY, JSON.stringify(merged));
+      sessionStorage.removeItem(DISMISSED_SUGGESTIONS_KEY);
+    }
+    return merged;
+  } catch {
+    return [];
+  }
+}
+
+function suggestionDismissId(suggestion: Suggestion) {
+  return [...suggestion.clients].sort((a, b) => a.localeCompare(b, "hr")).join("\n");
+}
+
+function isSuggestionDismissed(suggestion: Suggestion, dismissed: string[]) {
+  const id = suggestionDismissId(suggestion);
+  const legacy = `${suggestion.payerKey}|${suggestion.clients.join("|")}`;
+  return dismissed.includes(id) || dismissed.includes(legacy);
+}
 
 function matchesListSearch(query: string, parts: (string | undefined | null)[]): boolean {
   const q = query.trim().toLowerCase();
@@ -51,7 +87,11 @@ function matchesListSearch(query: string, parts: (string | undefined | null)[]):
     .includes(q);
 }
 
-export function ClientKeysPanel({ sessionId, onKeysChanged }: ClientKeysPanelProps) {
+export function ClientKeysPanel({
+  sessionId,
+  onKeysChanged,
+  suggestionsHost,
+}: ClientKeysPanelProps) {
   const [clients, setClients] = useState<ClientEntry[]>([]);
   const [groups, setGroups] = useState<PayerGroup[]>([]);
   const [extraAliases, setExtraAliases] = useState<ExtraAlias[]>([]);
@@ -64,11 +104,13 @@ export function ClientKeysPanel({ sessionId, onKeysChanged }: ClientKeysPanelPro
   const [newAliasKey, setNewAliasKey] = useState("");
   const [listSearch, setListSearch] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [skippedSuggestionNames, setSkippedSuggestionNames] = useState<Record<string, string[]>>({});
+  const [dismissedSuggestions, setDismissedSuggestions] = useState<string[]>([]);
 
   const sessionClientNames = new Set(clients.map((c) => c.name));
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (initial = false) => {
+    if (initial) setLoading(true);
     setLoadError(null);
     try {
       const data = await getSessionClientKeys(sessionId);
@@ -78,6 +120,7 @@ export function ClientKeysPanel({ sessionId, onKeysChanged }: ClientKeysPanelPro
       setSuggestions(data.suggestions ?? []);
       setAllPayerKeys(data.allPayerKeys);
       setDraftKeys({});
+      setSkippedSuggestionNames({});
     } catch (err) {
       setClients([]);
       setExtraAliases([]);
@@ -89,7 +132,11 @@ export function ClientKeysPanel({ sessionId, onKeysChanged }: ClientKeysPanelPro
   }, [sessionId]);
 
   useEffect(() => {
-    void load();
+    setDismissedSuggestions(readDismissedSuggestions());
+  }, []);
+
+  useEffect(() => {
+    void load(true);
   }, [load]);
 
   const filteredClients = useMemo(
@@ -161,17 +208,55 @@ export function ClientKeysPanel({ sessionId, onKeysChanged }: ClientKeysPanelPro
     }
   };
 
+  const suggestionId = (suggestion: Suggestion) =>
+    `${suggestion.payerKey}|${suggestion.clients.join("|")}`;
+
+  const selectedSuggestionNames = (suggestion: Suggestion) => {
+    const skipped = new Set(skippedSuggestionNames[suggestionId(suggestion)] ?? []);
+    return suggestion.clients.filter((name) => !skipped.has(name));
+  };
+
+  const toggleSuggestionName = (suggestion: Suggestion, name: string) => {
+    const id = suggestionId(suggestion);
+    setSkippedSuggestionNames((current) => {
+      const skipped = new Set(current[id] ?? []);
+      if (skipped.has(name)) skipped.delete(name);
+      else skipped.add(name);
+      return { ...current, [id]: [...skipped] };
+    });
+  };
+
   const applySuggestion = async (suggestion: Suggestion) => {
+    const names = selectedSuggestionNames(suggestion);
+    if (names.length === 0) return;
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     setSaving(`suggest:${suggestion.payerKey}`);
     try {
-      for (const name of suggestion.clients) {
+      for (const name of names) {
         await setClientPayerKey(name, suggestion.payerKey);
       }
+      if (names.length < suggestion.clients.length) dismissSuggestion(suggestion);
       await load();
-      onKeysChanged?.();
+      await onKeysChanged?.();
     } finally {
       setSaving(null);
+      const restore = () => window.scrollTo(scrollX, scrollY);
+      requestAnimationFrame(() => {
+        restore();
+        requestAnimationFrame(restore);
+      });
     }
+  };
+
+  const dismissSuggestion = (suggestion: Suggestion) => {
+    const id = suggestionDismissId(suggestion);
+    setDismissedSuggestions((current) => {
+      const next = current.includes(id) ? current : [...current, id];
+      localStorage.setItem(DISMISSED_SUGGESTIONS_KEY, JSON.stringify(next));
+      return next;
+    });
   };
 
   const resetGroup = async (group: PayerGroup) => {
@@ -186,6 +271,73 @@ export function ClientKeysPanel({ sessionId, onKeysChanged }: ClientKeysPanelPro
     }
   };
 
+  const visibleSuggestions = suggestions.filter(
+    (suggestion) => !isSuggestionDismissed(suggestion, dismissedSuggestions),
+  );
+
+  const suggestionSection: ReactNode =
+    visibleSuggestions.length === 0 ? null : (
+      <section className="rounded-md border p-3">
+        <p className="text-sm font-medium">{hr.clientKeys.suggestions}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{hr.clientKeys.suggestionsHint}</p>
+        <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {visibleSuggestions.map((suggestion) => {
+            const selected = selectedSuggestionNames(suggestion);
+            const savingSuggestion = saving === `suggest:${suggestion.payerKey}`;
+            return (
+              <div key={suggestionId(suggestion)} className="space-y-1.5 rounded-md border bg-muted/30 p-3">
+                <div className="flex items-start justify-between gap-1">
+                  <p className="font-medium text-foreground">{suggestion.payerKey}</p>
+                  <button
+                    type="button"
+                    className="inline-flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+                    aria-label={hr.clientKeys.dismissSuggestion}
+                    onClick={() => dismissSuggestion(suggestion)}
+                  >
+                    <X className="size-3" />
+                  </button>
+                </div>
+                <ul className="space-y-0.5">
+                  {suggestion.clients.map((name) => {
+                    const checked = selected.includes(name);
+                    return (
+                      <li key={name}>
+                        <label className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
+                          <input
+                            type="checkbox"
+                            className="mt-0.5"
+                            checked={checked}
+                            disabled={savingSuggestion}
+                            onChange={() => toggleSuggestionName(suggestion, name)}
+                          />
+                          <span className="min-w-0 break-words" title={name}>
+                            {name}
+                          </span>
+                        </label>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 px-1.5 text-[11px]"
+                  disabled={savingSuggestion || selected.length === 0}
+                  onClick={() => void applySuggestion(suggestion)}
+                >
+                  {savingSuggestion ? (
+                    <Loader2 className="size-3 animate-spin" />
+                  ) : (
+                    hr.clientKeys.applySuggestion
+                  )}
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    );
+
   if (loading) {
     return (
       <div className="flex flex-1 items-center justify-center py-12">
@@ -196,6 +348,9 @@ export function ClientKeysPanel({ sessionId, onKeysChanged }: ClientKeysPanelPro
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+      {suggestionsHost && suggestionSection
+        ? createPortal(suggestionSection, suggestionsHost)
+        : null}
       <div className="shrink-0">
         <h3 className="flex items-center gap-2 font-medium">
           <KeyRound className="size-4 shrink-0" />
@@ -203,30 +358,6 @@ export function ClientKeysPanel({ sessionId, onKeysChanged }: ClientKeysPanelPro
         </h3>
         <p className="mt-1 text-xs text-muted-foreground">{hr.clientKeys.description}</p>
         {loadError ? <p className="mt-1 text-xs text-destructive">{loadError}</p> : null}
-        {suggestions.length > 0 && (
-          <div className="mt-2 space-y-1 rounded border border-dashed p-2">
-            <p className="text-xs font-medium">{hr.clientKeys.suggestions}</p>
-            <p className="text-[11px] text-muted-foreground">{hr.clientKeys.suggestionsHint}</p>
-            {suggestions.map((suggestion) => (
-              <div key={`${suggestion.payerKey}-${suggestion.clients.join("|")}`} className="flex items-start justify-between gap-2">
-                <p className="min-w-0 text-[11px] text-muted-foreground">
-                  <span className="font-medium text-foreground">{suggestion.payerKey}</span>
-                  {" · "}
-                  {suggestion.clients.join(", ")}
-                </p>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-6 shrink-0 px-1.5 text-[11px]"
-                  disabled={saving === `suggest:${suggestion.payerKey}`}
-                  onClick={() => void applySuggestion(suggestion)}
-                >
-                  {hr.clientKeys.applySuggestion}
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       <div className="shrink-0 space-y-1">

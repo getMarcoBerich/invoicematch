@@ -1,91 +1,44 @@
-import { attachPayerKeys, normalizeClient } from "@/lib/clients/payer-keys";
 import { hr } from "@/lib/i18n/hr";
-import { findRemainderAllocations, isOpenAmount, openAmountFor, roundMoney } from "@/lib/matching/allocate";
+import { isOpenAmount, openAmountFor, roundMoney } from "@/lib/matching/allocate";
+import { buildAutoMatchPlan, type AutoMatchPlan } from "@/lib/matching/plan";
 import { loadPayerKeyMap } from "@/lib/services/client-keys";
 import { getDb } from "@/lib/storage/db";
-import { findBestMatches } from "./scorer";
 import { nanoid } from "nanoid";
 
-export async function runAutoMatch(sessionId: string, threshold = 75) {
+export type { AutoMatchPlan } from "@/lib/matching/plan";
+
+export async function planAutoMatch(sessionId: string, threshold = 75): Promise<AutoMatchPlan> {
   const db = getDb();
+  const [sessionInvoices, sessionPayments, existingMatches, payerKeyMap] = await Promise.all([
+    db.invoices.where("sessionId").equals(sessionId).toArray(),
+    db.payments.where("sessionId").equals(sessionId).toArray(),
+    db.matches.where("sessionId").equals(sessionId).filter((match) => match.active).toArray(),
+    loadPayerKeyMap(),
+  ]);
+  return buildAutoMatchPlan(sessionInvoices, sessionPayments, existingMatches, payerKeyMap, threshold);
+}
 
-  const sessionInvoices = await db.invoices.where("sessionId").equals(sessionId).toArray();
-  const sessionPayments = await db.payments.where("sessionId").equals(sessionId).toArray();
-  const existingMatches = await db.matches
-    .where("sessionId")
-    .equals(sessionId)
-    .filter((m) => m.active)
-    .toArray();
-
-  const payerKeyMap = await loadPayerKeyMap();
-  const invoiceOpen = new Map(
-    sessionInvoices.map((invoice) => [
-      invoice.id,
-      openAmountFor(
-        invoice.total,
-        existingMatches.filter((match) => match.invoiceId === invoice.id),
-      ),
-    ]),
-  );
-  const paymentOpen = new Map(
-    sessionPayments.map((payment) => [
-      payment.id,
-      openAmountFor(
-        payment.amount,
-        existingMatches.filter((match) => match.paymentId === payment.id),
-      ),
-    ]),
-  );
-
-  const unmatchedInvoices = attachPayerKeys(
-    sessionInvoices
-      .filter((invoice) => isOpenAmount(invoiceOpen.get(invoice.id) ?? invoice.total))
-      .map((invoice) => ({
-        id: invoice.id,
-        invoiceNumber: invoice.invoiceNumber,
-        invoiceDate: invoice.invoiceDate,
-        clientNormalized: normalizeClient(invoice.client),
-        total: invoiceOpen.get(invoice.id) ?? invoice.total,
-      })),
-    payerKeyMap,
-  );
-
-  const unmatchedPayments = attachPayerKeys(
-    sessionPayments
-      .filter((payment) => isOpenAmount(paymentOpen.get(payment.id) ?? Math.abs(payment.amount)))
-      .map((payment) => ({
-        id: payment.id,
-        paymentDate: payment.paymentDate,
-        clientNormalized: normalizeClient(payment.client),
-        amount: paymentOpen.get(payment.id) ?? Math.abs(payment.amount),
-        description: payment.description,
-      })),
-    payerKeyMap,
-  );
-
-  const bestMatches = findBestMatches(unmatchedInvoices, unmatchedPayments, threshold);
-  const usedInvoices = new Set(bestMatches.map((match) => match.invoiceId));
-  const usedPayments = new Set(bestMatches.map((match) => match.paymentId));
-  const remainder = findRemainderAllocations(
-    unmatchedInvoices.filter((invoice) => !usedInvoices.has(invoice.id)),
-    unmatchedPayments.filter((payment) => !usedPayments.has(payment.id)),
-  );
-  const planned = [
-    ...bestMatches.map((match) => ({
-      invoiceId: match.invoiceId,
-      paymentId: match.paymentId,
-      confidence: match.confidence,
-      reasons: match.reasons,
-      allocatedAmount: roundMoney(
-        Math.min(invoiceOpen.get(match.invoiceId) ?? 0, paymentOpen.get(match.paymentId) ?? 0),
-      ),
-    })),
-    ...remainder,
-  ];
+export async function applyAutoMatchPlan(sessionId: string, plan: AutoMatchPlan) {
+  const db = getDb();
   const now = new Date();
 
   await db.transaction("rw", [db.matches, db.matchAudits], async () => {
-    for (const match of planned) {
+    for (const removal of plan.toRemove) {
+      await db.matches.update(removal.matchId, { active: false });
+      await db.matchAudits.add({
+        id: nanoid(),
+        matchId: removal.matchId,
+        sessionId,
+        action: "unlinked",
+        at: now,
+        meta: {
+          invoiceId: removal.invoiceId,
+          paymentId: removal.paymentId,
+          scope: "auto-review",
+        },
+      });
+    }
+    for (const match of plan.toAdd) {
       const matchId = nanoid();
       await db.matches.add({
         id: matchId,
@@ -110,7 +63,12 @@ export async function runAutoMatch(sessionId: string, threshold = 75) {
     }
   });
 
-  return { created: planned.length, total: planned.length };
+  return { created: plan.toAdd.length, removed: plan.toRemove.length, total: plan.toAdd.length };
+}
+
+export async function runAutoMatch(sessionId: string, threshold = 75) {
+  const plan = await planAutoMatch(sessionId, threshold);
+  return applyAutoMatchPlan(sessionId, plan);
 }
 
 export async function createManualMatch(

@@ -191,6 +191,38 @@ export function buildClientLedgers(
     .sort((a, b) => a.label.localeCompare(b.label, "hr"));
 }
 
+export type OpenItem = {
+  id: string;
+  client: string;
+  document: string;
+  date: string;
+  openAmount: number;
+  daysOpen: number;
+};
+
+export function buildOpenItems(ledgers: ClientLedger[]): OpenItem[] {
+  const items: OpenItem[] = [];
+  for (const ledger of ledgers) {
+    for (const line of ledger.lines) {
+      if (line.kind !== "invoice" || line.openAmount <= 0.01) continue;
+      items.push({
+        id: line.id,
+        client: line.client,
+        document: line.document,
+        date: line.date,
+        openAmount: line.openAmount,
+        daysOpen: line.daysOpen ?? 0,
+      });
+    }
+  }
+  return items.sort(
+    (a, b) =>
+      b.daysOpen - a.daysOpen ||
+      a.date.localeCompare(b.date) ||
+      a.document.localeCompare(b.document, "hr"),
+  );
+}
+
 export function ledgerTotals(ledgers: ClientLedger[]): LedgerTotals {
   return ledgers.reduce<LedgerTotals>(
     (totals, ledger) => {

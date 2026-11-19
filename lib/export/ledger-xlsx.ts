@@ -200,6 +200,70 @@ export async function buildLedgerXlsx(ledgers: ClientLedger[]): Promise<ArrayBuf
   return buffer as ArrayBuffer;
 }
 
+export async function buildOpenItemsXlsx(
+  items: { client: string; document: string; date: string; openAmount: number; daysOpen: number }[],
+): Promise<ArrayBuffer> {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "Uparivanje računa";
+  const sheet = workbook.addWorksheet(hr.workspace.tabs.openItems.slice(0, 31));
+  sheet.columns = [
+    { width: 36 },
+    { width: 22 },
+    { width: 14 },
+    { width: 14 },
+    { width: 10 },
+  ];
+  const headers = [
+    hr.ledger.client,
+    hr.ledger.document,
+    hr.ledger.date,
+    hr.ledger.openAmount,
+    hr.ledger.daysOpen,
+  ];
+  const header = sheet.addRow(headers);
+  header.font = { bold: true };
+  header.eachCell((cell) => {
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: HEADER_FILL } };
+    cell.border = thinBorder;
+  });
+  for (const item of items) {
+    const row = sheet.addRow([
+      item.client,
+      item.document,
+      item.date ? excelDate(item.date) : "",
+      item.openAmount,
+      item.daysOpen,
+    ]);
+    row.getCell(3).numFmt = DATE_FORMAT;
+    row.getCell(4).numFmt = MONEY_FORMAT;
+    row.eachCell((cell) => {
+      cell.border = thinBorder;
+    });
+  }
+  const buffer = await workbook.xlsx.writeBuffer();
+  return buffer as ArrayBuffer;
+}
+
+export async function downloadOpenItemsWorkbook(
+  items: { client: string; document: string; date: string; openAmount: number; daysOpen: number }[],
+  filename: string,
+) {
+  const buffer = await buildOpenItemsXlsx(items);
+  const blob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+export function openItemsXlsxFilename(sessionName: string): string {
+  return `${hr.export.openItemsFilenamePrefix}-${sanitizeFilename(sessionName)}.xlsx`;
+}
+
 export async function downloadLedgerWorkbook(ledgers: ClientLedger[], filename: string) {
   const buffer = await buildLedgerXlsx(ledgers);
   const blob = new Blob([buffer], {

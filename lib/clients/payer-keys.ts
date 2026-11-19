@@ -34,6 +34,14 @@ export function foldClientName(name: string): string {
     .replace(/\s+/g, " ");
 }
 
+/** True when the payment description names this client, not merely a shared surname. */
+export function descriptionMentionsClient(client: string, description: string): boolean {
+  const name = foldClientName(client);
+  if (name.length < 4) return false;
+  const text = foldClientName(description);
+  return ` ${text} `.includes(` ${name} `);
+}
+
 export type PayerKeyGroup = {
   payerKey: string;
   clients: string[];

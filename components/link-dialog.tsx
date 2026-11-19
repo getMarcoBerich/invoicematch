@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { formatAmount, formatDate } from "@/lib/format";
 import { hr } from "@/lib/i18n/hr";
+import { descriptionMentionsClient } from "@/lib/clients/payer-keys";
 import { cn } from "@/lib/utils";
 import type { RecordRow } from "@/lib/types";
 import {
@@ -267,10 +268,12 @@ function InvoicePicker({
   invoices,
   selectedId,
   onSelect,
+  paymentDescription,
 }: {
   invoices: UnmatchedInvoice[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  paymentDescription?: string;
 }) {
   const [sortField, setSortField] = useState<InvoiceSortField>("invoiceDate");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -349,6 +352,11 @@ function InvoicePicker({
               <span>{formatDate(inv.invoiceDate)}</span>
               <span className="text-right font-medium">{formatAmount(inv.total)}</span>
               <span className="truncate text-muted-foreground">{inv.client}</span>
+              {paymentDescription && descriptionMentionsClient(inv.client, paymentDescription) ? (
+                <span className="col-span-full text-xs text-amber-700 dark:text-amber-400">
+                  {hr.dialog.clientInDescription}
+                </span>
+              ) : null}
             </button>
           ))
         )}
@@ -361,10 +369,12 @@ function PaymentPicker({
   payments,
   selectedId,
   onSelect,
+  sourceClient,
 }: {
   payments: UnmatchedPayment[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  sourceClient?: string;
 }) {
   const [sortField, setSortField] = useState<PaymentSortField>("paymentDate");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -442,6 +452,11 @@ function PaymentPicker({
               <span>{formatDate(pay.paymentDate)}</span>
               <span className="truncate text-muted-foreground">{pay.client}</span>
               <span className="truncate text-muted-foreground">{pay.description}</span>
+              {sourceClient && descriptionMentionsClient(sourceClient, pay.description) ? (
+                <span className="col-span-full text-xs text-amber-700 dark:text-amber-400">
+                  {hr.dialog.clientInDescription}
+                </span>
+              ) : null}
             </button>
           ))
         )}
@@ -667,6 +682,7 @@ export function LinkDialog({
                       invoices={unmatchedInvoices}
                       selectedId={selectedInvoiceId}
                       onSelect={setSelectedInvoiceId}
+                      paymentDescription={source?.kind === "payment" ? source.description : undefined}
                     />
                   </div>
                 </div>
@@ -680,6 +696,7 @@ export function LinkDialog({
                       payments={unmatchedPayments}
                       selectedId={selectedPaymentId}
                       onSelect={setSelectedPaymentId}
+                      sourceClient={source?.kind === "invoice" ? source.client : undefined}
                     />
                   </div>
                 </div>
