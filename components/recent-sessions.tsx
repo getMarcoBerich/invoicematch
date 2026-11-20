@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Clock, FileSpreadsheet, Loader2, Pencil, Trash2, Upload } from "lucide-react";
+import { ChevronRight, Clock, FileSpreadsheet, GitMerge, Loader2, Pencil, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -16,7 +17,7 @@ import {
 import { formatDateTime } from "@/lib/format";
 import { hr } from "@/lib/i18n/hr";
 import { getSessionDisplayName } from "@/lib/session-name";
-import { deleteAllSessions, listSessionSummaries } from "@/lib/services/session";
+import { deleteAllSessions, deleteSession, listSessionSummaries, mergeSessions } from "@/lib/services/session";
 import { importSessionBundle } from "@/lib/services/session-bundle";
 import { RenameSessionDialog } from "@/components/rename-session-dialog";
 
@@ -42,6 +43,10 @@ export function RecentSessions({ refreshToken = 0 }: RecentSessionsProps) {
   const [error, setError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<SessionSummary | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<SessionSummary | null>(null);
+  const [mergeInto, setMergeInto] = useState<SessionSummary | null>(null);
+  const [mergeFromId, setMergeFromId] = useState("");
+  const [merging, setMerging] = useState(false);
   const [importing, setImporting] = useState(false);
 
   const loadSessions = useCallback(async () => {
@@ -58,6 +63,36 @@ export function RecentSessions({ refreshToken = 0 }: RecentSessionsProps) {
       setLoading(false);
     }
   }, []);
+
+  const mergeOneSession = async () => {
+    if (!mergeInto || !mergeFromId) return;
+    setMerging(true);
+    setError(null);
+    try {
+      await mergeSessions(mergeInto.id, mergeFromId);
+      setMergeInto(null);
+      await loadSessions();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : hr.upload.mergeSessionFailed);
+    } finally {
+      setMerging(false);
+    }
+  };
+
+  const deleteOneSession = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await deleteSession(deleteTarget.id);
+      setSessions((current) => current.filter((session) => session.id !== deleteTarget.id));
+      setDeleteTarget(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : hr.upload.deleteSessionFailed);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const deleteAllSessionsHandler = async () => {
     setDeleting(true);
@@ -175,6 +210,21 @@ export function RecentSessions({ refreshToken = 0 }: RecentSessionsProps) {
                       </div>
                       <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
                     </button>
+                    {sessions.length > 1 ? (
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="shrink-0"
+                        aria-label={hr.upload.mergeSession}
+                        onClick={() => {
+                          const other = sessions.find((candidate) => candidate.id !== session.id);
+                          setMergeFromId(other?.id ?? "");
+                          setMergeInto(session);
+                        }}
+                      >
+                        <GitMerge className="size-3.5" />
+                      </Button>
+                    ) : null}
                     <Button
                       variant="ghost"
                       size="icon-sm"
@@ -184,6 +234,15 @@ export function RecentSessions({ refreshToken = 0 }: RecentSessionsProps) {
                     >
                       <Pencil className="size-3.5" />
                     </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="shrink-0 text-destructive hover:text-destructive"
+                      aria-label={hr.upload.deleteSession}
+                      onClick={() => setDeleteTarget(session)}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
                   </div>
                 </li>
               );
@@ -192,6 +251,72 @@ export function RecentSessions({ refreshToken = 0 }: RecentSessionsProps) {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={mergeInto !== null} onOpenChange={(open) => !merging && !open && setMergeInto(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{hr.upload.mergeSessionTitle}</DialogTitle>
+            <DialogDescription>
+              {mergeInto
+                ? hr.upload.mergeSessionDescription(
+                    getSessionDisplayName(mergeInto),
+                    getSessionDisplayName(
+                      sessions.find((session) => session.id === mergeFromId) ?? {
+                        name: "",
+                        filename: "",
+                      },
+                    ),
+                  )
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>{hr.upload.mergeSessionPick}</Label>
+            <select
+              className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm"
+              value={mergeFromId}
+              onChange={(event) => setMergeFromId(event.target.value)}
+            >
+              {sessions
+                .filter((session) => session.id !== mergeInto?.id)
+                .map((session) => (
+                  <option key={session.id} value={session.id}>
+                    {getSessionDisplayName(session)}
+                  </option>
+                ))}
+            </select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" disabled={merging} onClick={() => setMergeInto(null)}>
+              {hr.upload.deleteAllSessionsCancel}
+            </Button>
+            <Button disabled={merging || !mergeFromId} onClick={() => void mergeOneSession()}>
+              {merging ? hr.upload.mergeSessionBusy : hr.upload.mergeSessionConfirm}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteTarget !== null} onOpenChange={(open) => !deleting && !open && setDeleteTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{hr.upload.deleteSessionConfirmTitle}</DialogTitle>
+            <DialogDescription>
+              {deleteTarget
+                ? hr.upload.deleteSessionConfirmDescription(getSessionDisplayName(deleteTarget))
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" disabled={deleting} onClick={() => setDeleteTarget(null)}>
+              {hr.upload.deleteAllSessionsCancel}
+            </Button>
+            <Button variant="destructive" disabled={deleting} onClick={() => void deleteOneSession()}>
+              {deleting ? hr.upload.deletingSessions : hr.upload.deleteSessionConfirm}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={confirmOpen} onOpenChange={(open) => !deleting && setConfirmOpen(open)}>
         <DialogContent>

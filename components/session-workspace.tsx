@@ -1,9 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Download, Loader2, Pencil, RefreshCw, Unlink } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Download, FileSpreadsheet, GitMerge, Loader2, Pencil, RefreshCw, Trash2, Unlink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -48,12 +50,25 @@ import { buildClientLedgers, buildOpenItems, ledgerTotals } from "@/lib/ledger";
 import { closeCallsFromRecords } from "@/lib/matching/close-calls";
 import { runAutoMatch, unlinkAllMatches, unlinkMatch, createManualMatch } from "@/lib/matching/engine";
 import { getSessionClientKeys } from "@/lib/services/client-keys";
-import { getSessionDisplayName, getSessionRecords } from "@/lib/services/session";
+import {
+  deleteSession,
+  getSessionDisplayName,
+  getSessionRecords,
+  listSessionSummaries,
+  mergeSessions,
+} from "@/lib/services/session";
+import { applySessionUpdate, previewSessionUpdate, type SessionUpdatePreview } from "@/lib/services/session-update";
 import type { RecordRow } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type SessionData = {
-  session: { id: string; filename: string; name: string; importedAt: string | Date };
+  session: {
+    id: string;
+    filename: string;
+    name: string;
+    importedAt: string | Date;
+    updatedAt?: string | Date;
+  };
   records: RecordRow[];
   stats: {
     totalInvoices: number;
@@ -79,6 +94,7 @@ function delay(ms: number) {
 }
 
 export function SessionWorkspace({ sessionId }: { sessionId: string }) {
+  const router = useRouter();
   const [data, setData] = useState<SessionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +109,17 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
   const [matchWarningOpen, setMatchWarningOpen] = useState(false);
   const [payerKeyMap, setPayerKeyMap] = useState<PayerKeyMap>(new Map());
   const [renameOpen, setRenameOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletingSession, setDeletingSession] = useState(false);
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const [mergeSources, setMergeSources] = useState<{ id: string; name: string; filename: string }[]>([]);
+  const [mergeFromId, setMergeFromId] = useState("");
+  const [merging, setMerging] = useState(false);
   const [suggestionsHost, setSuggestionsHost] = useState<HTMLDivElement | null>(null);
+  const [updateOpen, setUpdateOpen] = useState(false);
+  const [updatePreview, setUpdatePreview] = useState<SessionUpdatePreview | null>(null);
+  const [updating, setUpdating] = useState(false);
+  const updateFileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -137,6 +163,40 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
       setError(err instanceof Error ? err.message : hr.workspace.matchingFailed);
     } finally {
       setMatching(false);
+    }
+  };
+
+  const handleUpdateFile = async (file: File) => {
+    if (!file.name.toLowerCase().endsWith(".xlsx")) {
+      setError(hr.api.excelOnly);
+      return;
+    }
+    setUpdating(true);
+    setError(null);
+    try {
+      const preview = await previewSessionUpdate(sessionId, file.name, await file.arrayBuffer());
+      setUpdatePreview(preview);
+      setUpdateOpen(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : hr.workspace.updateExcelFailed);
+    } finally {
+      setUpdating(false);
+      if (updateFileRef.current) updateFileRef.current.value = "";
+    }
+  };
+
+  const handleApplyUpdate = async () => {
+    if (!updatePreview) return;
+    setUpdating(true);
+    try {
+      await applySessionUpdate(updatePreview);
+      setUpdateOpen(false);
+      setUpdatePreview(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : hr.workspace.updateExcelFailed);
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -287,10 +347,22 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
               >
                 <Pencil className="size-3.5" />
               </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="shrink-0 text-destructive hover:text-destructive"
+                onClick={() => setDeleteOpen(true)}
+                aria-label={hr.upload.deleteSession}
+              >
+                <Trash2 className="size-3.5" />
+              </Button>
             </div>
             <p className="text-xs text-muted-foreground">
               {hr.workspace.sourceFile(data.session.filename)} · {hr.workspace.imported}{" "}
               {formatDateTime(data.session.importedAt)}
+              {data.session.updatedAt
+                ? ` · ${hr.workspace.updated} ${formatDateTime(data.session.updatedAt)}`
+                : ""}
             </p>
           </div>
         </div>
@@ -329,6 +401,45 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
               <Unlink className={compactMatchButton ? "size-4" : "size-5"} />
             )}
             {unlinkingAll ? hr.workspace.unlinkingAll : hr.workspace.unlinkAll}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={matching || unlinkingAll || updating || merging}
+            onClick={() => {
+              void listSessionSummaries()
+                .then((sessions) => {
+                  const others = sessions.filter((session) => session.id !== sessionId);
+                  setMergeSources(others);
+                  setMergeFromId(others[0]?.id ?? "");
+                  setMergeOpen(true);
+                })
+                .catch((err) => {
+                  setError(err instanceof Error ? err.message : hr.upload.mergeSessionFailed);
+                });
+            }}
+          >
+            <GitMerge className="size-4" />
+            {hr.upload.mergeSession}
+          </Button>
+          <input
+            ref={updateFileRef}
+            type="file"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) void handleUpdateFile(file);
+            }}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={matching || unlinkingAll || updating}
+            onClick={() => updateFileRef.current?.click()}
+          >
+            {updating ? <Loader2 className="size-4 animate-spin" /> : <FileSpreadsheet className="size-4" />}
+            {updating ? hr.workspace.updateExcelBusy : hr.workspace.updateExcel}
           </Button>
           <Button variant="outline" size="sm" onClick={handleExportAll}>
             <Download className="size-4" />
@@ -497,6 +608,96 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
         onComplete={load}
       />
 
+      <Dialog open={mergeOpen} onOpenChange={(open) => !merging && setMergeOpen(open)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{hr.upload.mergeSessionTitle}</DialogTitle>
+            <DialogDescription>
+              {mergeSources.length === 0
+                ? hr.upload.mergeSessionEmpty
+                : hr.upload.mergeSessionDescription(
+                    displayName,
+                    getSessionDisplayName(
+                      mergeSources.find((session) => session.id === mergeFromId) ?? {
+                        name: "",
+                        filename: "",
+                      },
+                    ),
+                  )}
+            </DialogDescription>
+          </DialogHeader>
+          {mergeSources.length > 0 ? (
+            <div className="space-y-2">
+              <Label>{hr.upload.mergeSessionPick}</Label>
+              <select
+                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm"
+                value={mergeFromId}
+                onChange={(event) => setMergeFromId(event.target.value)}
+              >
+                {mergeSources.map((session) => (
+                  <option key={session.id} value={session.id}>
+                    {getSessionDisplayName(session)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button variant="outline" disabled={merging} onClick={() => setMergeOpen(false)}>
+              {hr.upload.deleteAllSessionsCancel}
+            </Button>
+            <Button
+              disabled={merging || !mergeFromId}
+              onClick={() => {
+                setMerging(true);
+                void mergeSessions(sessionId, mergeFromId)
+                  .then(async () => {
+                    setMergeOpen(false);
+                    await load();
+                  })
+                  .catch((err) => {
+                    setError(err instanceof Error ? err.message : hr.upload.mergeSessionFailed);
+                  })
+                  .finally(() => setMerging(false));
+              }}
+            >
+              {merging ? hr.upload.mergeSessionBusy : hr.upload.mergeSessionConfirm}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteOpen} onOpenChange={(open) => !deletingSession && setDeleteOpen(open)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{hr.upload.deleteSessionConfirmTitle}</DialogTitle>
+            <DialogDescription>
+              {hr.upload.deleteSessionConfirmDescription(displayName)}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" disabled={deletingSession} onClick={() => setDeleteOpen(false)}>
+              {hr.upload.deleteAllSessionsCancel}
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deletingSession}
+              onClick={() => {
+                setDeletingSession(true);
+                void deleteSession(sessionId)
+                  .then(() => router.push("/"))
+                  .catch((err) => {
+                    setError(err instanceof Error ? err.message : hr.upload.deleteSessionFailed);
+                    setDeletingSession(false);
+                  });
+              }}
+            >
+              {deletingSession ? hr.upload.deletingSessions : hr.upload.deleteSessionConfirm}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <RenameSessionDialog
         open={renameOpen}
         onOpenChange={setRenameOpen}
@@ -522,6 +723,42 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
             </Button>
             <Button onClick={() => void handleRunMatch()} disabled={matching}>
               {hr.workspace.matchWarningConfirm}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={updateOpen}
+        onOpenChange={(open) => {
+          if (updating) return;
+          setUpdateOpen(open);
+          if (!open) setUpdatePreview(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{hr.workspace.updateExcelTitle}</DialogTitle>
+            <DialogDescription>
+              {updatePreview ? hr.workspace.updateExcelDescription(updatePreview.filename) : null}
+            </DialogDescription>
+          </DialogHeader>
+          {updatePreview ? (
+            <ul className="space-y-1 text-sm">
+              <li>{hr.workspace.updateExcelAddedInvoices(updatePreview.counts.addedInvoices)}</li>
+              <li>{hr.workspace.updateExcelAddedPayments(updatePreview.counts.addedPayments)}</li>
+              <li>{hr.workspace.updateExcelChangedInvoices(updatePreview.counts.updatedInvoices)}</li>
+            </ul>
+          ) : null}
+          {updatePreview && updatePreview.warnings.length > 0 ? (
+            <p className="text-sm text-muted-foreground">{updatePreview.warnings.slice(0, 3).join(" ")}</p>
+          ) : null}
+          <DialogFooter>
+            <Button variant="outline" disabled={updating} onClick={() => setUpdateOpen(false)}>
+              {hr.dialog.cancel}
+            </Button>
+            <Button disabled={updating || !updatePreview} onClick={() => void handleApplyUpdate()}>
+              {updating ? hr.workspace.updateExcelBusy : hr.workspace.updateExcelConfirm}
             </Button>
           </DialogFooter>
         </DialogContent>

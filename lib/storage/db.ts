@@ -7,6 +7,7 @@ export type ImportSessionRow = {
   filename: string;
   name: string;
   importedAt: Date;
+  updatedAt?: Date;
 };
 
 export type InvoiceRow = {

@@ -22,6 +22,21 @@ export const hr = {
     loadSessionsFailed: "Učitavanje sesija nije uspjelo",
     sessionSummary: (invoices: number, payments: number, matched: number) =>
       `${invoices} računa · ${payments} uplata · ${matched} upareno`,
+    mergeSession: "Spoji sesiju",
+    mergeSessionTitle: "Spoji sesije",
+    mergeSessionDescription: (intoName: string, fromName: string) =>
+      `Računi, uplate i uparivanja iz „${fromName}” dodaju se u „${intoName}”. Sesija „${fromName}” se zatim uklanja. Isti broj računa i ista uplata ostaju jednom. Neupareni zapisi ostaju.`,
+    mergeSessionPick: "Sesija koja se dodaje",
+    mergeSessionConfirm: "Spoji",
+    mergeSessionBusy: "Spajanje…",
+    mergeSessionFailed: "Spajanje sesija nije uspjelo",
+    mergeSessionEmpty: "Nema druge sesije za spajanje.",
+    deleteSession: "Obriši sesiju",
+    deleteSessionConfirmTitle: "Obrisati sesiju?",
+    deleteSessionConfirmDescription: (name: string) =>
+      `Trajno će se obrisati sesija „${name}”, njeni računi, uplate i uparivanja. Ključevi platioca ostaju.`,
+    deleteSessionConfirm: "Obriši",
+    deleteSessionFailed: "Brisanje sesije nije uspjelo",
     deleteAllSessions: "Obriši sve sesije",
     deleteAllSessionsConfirmTitle: "Obrisati sve sesije?",
     deleteAllSessionsConfirmDescription:
@@ -88,6 +103,18 @@ export const hr = {
     cancelSessionName: "Odustani",
     renameSessionFailed: "Spremanje naziva nije uspjelo",
     sourceFile: (filename: string) => `Datoteka: ${filename}`,
+    updated: "Ažurirano",
+    updateExcel: "Ažuriraj Excel",
+    updateExcelTitle: "Ažuriraj sesiju iz Excela",
+    updateExcelDescription: (filename: string) =>
+      `Datoteka ${filename} istog je formata. Novi računi i uplate se dodaju. Račun s istim brojem se ažurira. Postojeći zapisi i uparivanja ostaju, i kad nisu upareni.`,
+    updateExcelFailed: "Ažuriranje nije uspjelo",
+    updateExcelEmpty: "Datoteka nema računa ni uplata.",
+    updateExcelAddedInvoices: (n: number) => `Novi računi: ${n}`,
+    updateExcelAddedPayments: (n: number) => `Nove uplate: ${n}`,
+    updateExcelChangedInvoices: (n: number) => `Ažurirani računi: ${n}`,
+    updateExcelConfirm: "Ažuriraj",
+    updateExcelBusy: "Ažuriranje…",
     rerunMatch: "Automatsko uparivanje",
     matchWarningTitle: "Prije uparivanja",
     matchWarningDescription:

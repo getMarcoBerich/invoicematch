@@ -79,7 +79,7 @@ export async function importExcelFile(filename: string, buffer: ArrayBuffer) {
 }
 
 export async function getSessionRecords(sessionId: string): Promise<{
-  session: { id: string; filename: string; name: string; importedAt: Date };
+  session: { id: string; filename: string; name: string; importedAt: Date; updatedAt?: Date };
   records: RecordRow[];
   stats: {
     totalInvoices: number;
@@ -194,6 +194,7 @@ export async function getSessionRecords(sessionId: string): Promise<{
       filename: session.filename,
       name: session.name,
       importedAt: session.importedAt,
+      updatedAt: session.updatedAt,
     },
     records,
     stats: {
@@ -239,6 +240,111 @@ export async function listSessionSummaries(limit = 30) {
   );
 
   return summaries;
+}
+
+export async function mergeSessions(intoId: string, fromId: string) {
+  if (intoId === fromId) throw new Error(hr.api.sessionNotFound);
+  const db = getDb();
+  const [into, from] = await Promise.all([
+    db.importSessions.get(intoId),
+    db.importSessions.get(fromId),
+  ]);
+  if (!into || !from) throw new Error(hr.api.sessionNotFound);
+
+  const [intoInvoices, fromInvoices, intoPayments, fromPayments, fromMatches] = await Promise.all([
+    db.invoices.where("sessionId").equals(intoId).toArray(),
+    db.invoices.where("sessionId").equals(fromId).toArray(),
+    db.payments.where("sessionId").equals(intoId).toArray(),
+    db.payments.where("sessionId").equals(fromId).toArray(),
+    db.matches.where("sessionId").equals(fromId).toArray(),
+  ]);
+
+  const invoiceByNumber = new Map(intoInvoices.map((invoice) => [invoice.invoiceNumber, invoice.id]));
+  const paymentByHash = new Map(intoPayments.map((payment) => [payment.rowHash, payment.id]));
+  const invoiceIdMap = new Map<string, string>();
+  const paymentIdMap = new Map<string, string>();
+  const invoicesToMove: string[] = [];
+  const invoicesToDelete: string[] = [];
+  const paymentsToMove: string[] = [];
+  const paymentsToDelete: string[] = [];
+
+  for (const invoice of fromInvoices) {
+    const existingId = invoiceByNumber.get(invoice.invoiceNumber);
+    if (existingId) {
+      invoiceIdMap.set(invoice.id, existingId);
+      invoicesToDelete.push(invoice.id);
+    } else {
+      invoiceIdMap.set(invoice.id, invoice.id);
+      invoicesToMove.push(invoice.id);
+      invoiceByNumber.set(invoice.invoiceNumber, invoice.id);
+    }
+  }
+
+  for (const payment of fromPayments) {
+    const existingId = paymentByHash.get(payment.rowHash);
+    if (existingId) {
+      paymentIdMap.set(payment.id, existingId);
+      paymentsToDelete.push(payment.id);
+    } else {
+      paymentIdMap.set(payment.id, payment.id);
+      paymentsToMove.push(payment.id);
+      paymentByHash.set(payment.rowHash, payment.id);
+    }
+  }
+
+  const intoMatches = await db.matches.where("sessionId").equals(intoId).toArray();
+  const activePairs = new Set(
+    intoMatches.filter((match) => match.active).map((match) => `${match.invoiceId}|${match.paymentId}`),
+  );
+
+  await db.transaction(
+    "rw",
+    [db.importSessions, db.invoices, db.payments, db.matches, db.matchAudits],
+    async () => {
+      if (invoicesToMove.length > 0) {
+        await db.invoices.where("id").anyOf(invoicesToMove).modify({ sessionId: intoId });
+      }
+      if (invoicesToDelete.length > 0) await db.invoices.bulkDelete(invoicesToDelete);
+      if (paymentsToMove.length > 0) {
+        await db.payments.where("id").anyOf(paymentsToMove).modify({ sessionId: intoId });
+      }
+      if (paymentsToDelete.length > 0) await db.payments.bulkDelete(paymentsToDelete);
+
+      for (const match of fromMatches) {
+        const invoiceId = invoiceIdMap.get(match.invoiceId) ?? match.invoiceId;
+        const paymentId = paymentIdMap.get(match.paymentId) ?? match.paymentId;
+        const pair = `${invoiceId}|${paymentId}`;
+        if (match.active && activePairs.has(pair)) {
+          await db.matches.delete(match.id);
+          continue;
+        }
+        if (match.active) activePairs.add(pair);
+        await db.matches.update(match.id, { sessionId: intoId, invoiceId, paymentId });
+      }
+
+      await db.matchAudits.where("sessionId").equals(fromId).modify({ sessionId: intoId });
+      await db.importSessions.delete(fromId);
+      await db.importSessions.update(intoId, { updatedAt: new Date() });
+    },
+  );
+}
+
+export async function deleteSession(sessionId: string) {
+  const db = getDb();
+  const session = await db.importSessions.get(sessionId);
+  if (!session) throw new Error(hr.api.sessionNotFound);
+
+  await db.transaction(
+    "rw",
+    [db.importSessions, db.invoices, db.payments, db.matches, db.matchAudits],
+    async () => {
+      await db.invoices.where("sessionId").equals(sessionId).delete();
+      await db.payments.where("sessionId").equals(sessionId).delete();
+      await db.matches.where("sessionId").equals(sessionId).delete();
+      await db.matchAudits.where("sessionId").equals(sessionId).delete();
+      await db.importSessions.delete(sessionId);
+    },
+  );
 }
 
 export async function deleteAllSessions() {
